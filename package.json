@@ -1,0 +1,10 @@
+{
+  "name": "interior-designer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser-based 2D/3D floor plan and interior design tool",
+  "scripts": {
+    "start": "node serve.mjs"
+  }
+}

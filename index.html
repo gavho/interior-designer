@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Interior Designer — 2D/3D floor plans &amp; furnishing</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%232f7df6'/%3E%3Cpath d='M5 18V8l7-4 7 4v10h-5v-5h-4v5z' fill='%23fff'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+  <script type="importmap">
+  { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+      "three/examples/jsm/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+      "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.7.8/build/index.module.js",
+      "three-gpu-pathtracer": "https://cdn.jsdelivr.net/npm/three-gpu-pathtracer@0.0.23/build/index.module.js"
+  } }
+  </script>
+</head>
+<body>
+  <div id="app" data-view="split">
+    <header id="topbar"></header>
+    <nav id="rail"></nav>
+    <aside id="left"></aside>
+    <main id="stage">
+      <section id="pane2d"><canvas id="c2d"></canvas><div class="hud" id="hud2d"></div></section>
+      <section id="pane3d"><div class="hud" id="hud3d"></div></section>
+    </main>
+    <aside id="right"></aside>
+    <footer id="status"></footer>
+  </div>
+  <div id="toasts"></div>
+  <img id="printimg" alt="">
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
