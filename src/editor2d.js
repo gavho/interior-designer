@@ -3,7 +3,7 @@ import { S, on, emit, touch, commit, revert, select, toggleSel, isSel, find, sel
 import { add, sub, mul, dot, dist, norm, rot, rad, deg, clamp, normDeg, projectOnSegment, lineIntersect, pointInPoly, uid, fmtLen, fmtArea, parseLen } from './util.js';
 import { getDef, drawSymbol } from './catalog.js';
 import { getFloor, floorCanvas, TEX } from './materials.js';
-import { addWall, addOpening, wallMagnet, splitWall, itemGaps, arcPoints, addPolyWalls } from './ops.js';
+import { addWall, addOpening, wallMagnet, splitWall, itemGaps, arcPoints, addPolyWalls, sits, surfaceUnder, riders } from './ops.js';
 import { analyze, clearanceMap } from './analysis.js';
 
 const ACCENT = '#2f7df6', WALL = '#3a3f47';
@@ -93,6 +93,7 @@ function hitTest(p) {
     if (Math.abs(al - openingPos(o, g)) < o.width / 2 && Math.abs(pe) < w.thickness / 2 + px(5)) return { k: 'opening', id: o.id };
   }
   for (const w of d.walls) for (const e of ['a', 'b']) if (dist(w[e], p) < px(7)) return { k: 'vertex', p: { ...w[e] } };
+  if (it1 && sits(it1) && inItem(p, it1, px(2))) return { k: 'item', id: it1.id }; // a selected desk-top piece stays grabbable under a chair or monitor
   const items = d.items.filter(i => !getDef(i.type).flat).sort((a, b) => a.elev + a.h - (b.elev + b.h));
   for (let i = items.length - 1; i >= 0; i--) if (inItem(p, items[i], px(2))) return { k: 'item', id: items[i].id };
   for (const w of d.walls) if (projectOnSegment(p, w.a, w.b).dist < w.thickness / 2 + px(3)) return { k: 'wall', id: w.id };
@@ -426,7 +427,7 @@ function onDown(e) {
         const items = selOf('item').filter(i => !i.locked), walls = selOf('wall');
         const pts = []; walls.forEach(w => pts.push({ ...w.a }, { ...w.b }));
         drag = { t: 'move', start: p, moved: false, primary: hit.k === 'item' ? find('item', hit.id) : null,
-          items: items.map(it => ({ it, x: it.x, y: it.y, rot: it.rot })), labels: selOf('label').map(o => ({ o, x: o.x, y: o.y })), refs: wallEndRefs(pts) };
+          items: items.map(it => ({ it, x: it.x, y: it.y, rot: it.rot })), riders: riders(items).map(it => ({ it, x: it.x, y: it.y })), labels: selOf('label').map(o => ({ o, x: o.x, y: o.y })), refs: wallEndRefs(pts) };
         if (drag.primary?.locked) drag = null;
       }
     } else drag = { t: 'marquee', a: p, b: null, room: hit, shift: e.shiftKey };
@@ -510,6 +511,7 @@ function onMove(e) {
     const tpl = S.toolOpt.item, g = S.doc.settings.snap;
     let it = { ...tpl, x: S.prefs.snapGrid ? Math.round(p.x / g) * g : p.x, y: S.prefs.snapGrid ? Math.round(p.y / g) * g : p.y };
     if (S.prefs.magnet && !e.altKey) Object.assign(it, wallMagnet(it, true, 0.25));
+    if (sits(it)) it.elev = surfaceUnder(it);
     preview = it;
   } else if (tool === 'measure' || tool === 'calibrate') { const s = snap(p, { anchor: measureFrom, shift: e.shiftKey, grid: tool === 'measure' }); if (tool === 'measure') cursor = s; }
   else if (tool === 'room') snap(p);
@@ -538,7 +540,9 @@ function onDrag(e, p) {
       it.x = o.x + dx; it.y = o.y + dy; it.rot = o.rot;
       if (S.prefs.magnet && !e.altKey) Object.assign(it, wallMagnet(it, getDef(it.type).mount === 'wall'));
       if (!e.altKey) centerGuides(it);
+      if (sits(it)) it.elev = surfaceUnder(it); // desk-top pieces land on whatever is under them
     } else for (const o of d.items) { o.it.x = o.x + dx; o.it.y = o.y + dy; }
+    if (d.items.length) for (const r of d.riders) { r.it.x = r.x + d.items[0].it.x - d.items[0].x; r.it.y = r.y + d.items[0].it.y - d.items[0].y; }
     for (const o of d.labels) { o.o.x = o.x + (p.x - d.start.x); o.o.y = o.y + (p.y - d.start.y); }
     for (const r of d.refs) r.w[r.e] = { x: r.x + dx, y: r.y + dy };
     touch();
@@ -588,7 +592,7 @@ export function beginMove(e) {
   const items = selOf('item').filter(i => !i.locked);
   if (!items.length) return;
   mouse = evPos(e);
-  drag = { t: 'move', start: s2w(mouse), moved: false, primary: items[0], items: items.map(it => ({ it, x: it.x, y: it.y, rot: it.rot })), labels: [], refs: [] };
+  drag = { t: 'move', start: s2w(mouse), moved: false, primary: items[0], items: items.map(it => ({ it, x: it.x, y: it.y, rot: it.rot })), riders: riders(items).map(it => ({ it, x: it.x, y: it.y })), labels: [], refs: [] };
   cv.setPointerCapture(e.pointerId);
 }
 /** Where the selection toolbar should sit for a piece (pane pixels, above its footprint). */

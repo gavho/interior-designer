@@ -33,16 +33,24 @@ Work is autosaved in the browser; use **File → Save project** to keep a `.json
 - Dimensions, text labels, imperial or metric units, undo/redo, copy/paste, multi-select, align and distribute.
 
 **Furnish**
-- 60+ parametric pieces across living, bedroom, dining, kitchen, bath, office, utility, decor and structure.
-  Every piece can be resized freely (beds, rugs and vanities also have standard-size presets) and recoloured.
+- 140+ parametric pieces across living, bedroom, dining, kitchen, bath, office, desk setup, utility, decor and structure.
+  Every piece can be resized freely (beds, desks, rugs and vanities also have standard-size presets) and recoloured.
+- Office and desk-setup kit: standing, minimal and L-shaped desks, an ergonomic chair, cube and open shelving, monitors
+  (on a stand or an arm, with lit screens), monitor stands, laptop, keyboards with individual keys, mouse, desk mat, lamp,
+  speakers, headphones, plants and more. Desk-top pieces land on the desk, shelf or stand under them and move with it.
+- Modern appliances and furniture: flat-front fridge, wall ovens, induction cooktop, wine fridge, espresso machine,
+  air purifier, mini-split, low sofa, lounge chair and platform bed.
 - Furniture snaps flush to walls and into corners; live gap read-outs show the distance to surrounding walls.
 - Add your own: custom box / cylinder / L-shape, a product from the web (link, photo, dimensions, price),
   or a GLB / glTF / OBJ 3D model from a file or direct URL. Save anything to **My library** for reuse.
 - Browse and place free, realistic textured models from [Poly Haven](https://polyhaven.com/models) (CC0) inside the app.
+- Search [Sketchfab](https://sketchfab.com)'s downloadable models (mostly CC Attribution) inside the app. With your own
+  Sketchfab API token a click imports the model; without one it opens the model's page so you can download the GLB.
 - Kitchen kit: base, drawer, corner, tall and wall cabinets, countertops, backsplashes, hood and appliances,
   with wood species (visible grain in 3D) and countertop presets.
 - Wall decor: a separate finish for each side of every wall (paint, brick, tile, panelling, wallpaper),
-  plus art, gallery walls, slat panels, wainscoting, shelves, sconces and mirrors.
+  plus art, gallery walls, slat, fluted, acoustic and hexagon panels, pegboards, whiteboards, wainscoting, shelves,
+  picture ledges, sconces and mirrors.
 - Style palettes recolour walls, floors and furniture together; 14 floor finishes per room.
 
 **Check**
@@ -56,6 +64,7 @@ Work is autosaved in the browser; use **File → Save project** to keep a `.json
   ([three-gpu-pathtracer](https://github.com/gkjohnson/three-gpu-pathtracer)) that can be saved as an image.
 - Clicking a piece selects it and shows a toolbar (move, rotate, centre, duplicate, delete); it only moves on purpose.
 - Drag selected furniture directly in 3D. Export the plan or the 3D view as PNG, or print the plan.
+- Zoom right in to desk-top detail; double-click a piece in 3D to fly the camera to it.
 
 Press **?** in the app for the keyboard shortcuts.
 
@@ -70,6 +79,8 @@ Press **?** in the app for the keyboard shortcuts.
 | `src/editor2d.js` | 2D canvas editor: rendering, snapping and tools |
 | `src/view3d.js` | three.js scene built from the same document |
 | `src/catalog.js` | Parametric furniture definitions (one definition drives 2D symbol, thumbnail and 3D mesh) |
+| `src/catalog-extra.js` | Office, desk-setup, modern furniture and appliance definitions |
+| `src/parts.js` | The solids (boxes, rounded boxes, cylinders…) that pieces are assembled from |
 | `src/materials.js` | Procedural floor finishes and style palettes |
 | `src/ops.js` | Editing operations (add, move, split, align, wall magnet, palettes) |
 | `src/analysis.js` | Space-planning checks and the clearance map |

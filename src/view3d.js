@@ -4,6 +4,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
@@ -12,6 +13,7 @@ import { S, on, emit, touch, commit, select, isSel, find } from './state.js';
 import { rad, lerp, clamp, dot, sub, mul, add } from './util.js';
 import { partsFor, resolveColor, getDef } from './catalog.js';
 import { getFloor, floorCanvas, getFinish, finishCanvas, grainCanvas } from './materials.js';
+import { sits, surfaceUnder, riders } from './ops.js';
 import { contentBounds } from './editor2d.js';
 
 let renderer, scene, camera, controls, pane, sun, hemi, structure, itemsGroup, helpers, ground;
@@ -22,15 +24,39 @@ const walk = { yaw: 0, pitch: 0, keys: {}, last: 0 };
 
 // ---- shared geometry / materials ----
 const BOX = new THREE.BoxGeometry(1, 1, 1), SPH = new THREE.SphereGeometry(0.5, 24, 16);
-const DISC = new THREE.CylinderGeometry(0.5, 0.5, 1, 32).rotateX(Math.PI / 2);
-const cyls = new Map(), mats = new Map(), floorTex = new Map();
+const DISC = new THREE.CylinderGeometry(0.5, 0.5, 1, 32).rotateX(Math.PI / 2), HEX = new THREE.CylinderGeometry(0.5, 0.5, 1, 6).rotateX(Math.PI / 2);
+const cyls = new Map(), rboxes = new Map(), mats = new Map(), floorTex = new Map();
 const cylGeo = t => { if (!cyls.has(t)) cyls.set(t, new THREE.CylinderGeometry(0.5 * t, 0.5, 1, 32)); return cyls.get(t); };
+// rounded boxes are built at their real size (scaling a shared one would squash the corner radius)
+function rboxGeo(p) {
+  const r = Math.min(p.r, Math.min(p.w, p.h, p.d) * 0.499), k = [p.w, p.h, p.d, r].map(v => v.toFixed(4)).join('|');
+  if (!rboxes.has(k)) rboxes.set(k, new RoundedBoxGeometry(p.w, p.h, p.d, 3, r));
+  return rboxes.get(k);
+}
+// what a switched-on monitor shows: a wallpaper with a couple of windows
+let displayTex = null;
+function displayMap() {
+  if (displayTex) return displayTex;
+  const c = document.createElement('canvas'); c.width = 512; c.height = 288;
+  const g = c.getContext('2d'), bg = g.createLinearGradient(0, 0, 512, 288);
+  bg.addColorStop(0, '#27408b'); bg.addColorStop(0.55, '#7a5fc0'); bg.addColorStop(1, '#f0a37c'); g.fillStyle = bg; g.fillRect(0, 0, 512, 288);
+  g.fillStyle = '#1b1e26'; g.fillRect(28, 26, 270, 206); g.fillStyle = '#2a2e3a'; g.fillRect(28, 26, 270, 16);
+  ['#e0625a', '#e8b44a', '#5fbf6a'].forEach((col, i) => { g.fillStyle = col; g.beginPath(); g.arc(40 + i * 12, 34, 3.5, 0, 7); g.fill(); });
+  for (let i = 0; i < 17; i++) { g.fillStyle = ['#7aa2f7', '#c0caf5', '#9ece6a', '#bb9af7', '#e0af68'][(i * 7) % 5]; g.fillRect(42 + ((i * 5) % 4) * 12, 52 + i * 10, 40 + ((i * 37) % 150), 4); }
+  g.fillStyle = '#f4f4f1'; g.fillRect(318, 58, 168, 150); g.fillStyle = '#d9dbe0'; g.fillRect(318, 58, 168, 16);
+  for (let i = 0; i < 9; i++) { g.fillStyle = i % 4 ? '#b9bcc4' : '#4a4f5c'; g.fillRect(332, 88 + i * 12, i % 4 ? 110 + ((i * 29) % 30) : 70, 4); }
+  g.fillStyle = 'rgba(255,255,255,.28)'; g.fillRect(156, 260, 200, 20);
+  displayTex = new THREE.CanvasTexture(c); displayTex.colorSpace = THREE.SRGBColorSpace; displayTex.anisotropy = 8;
+  return displayTex;
+}
 function mat(color, kind = 'std') {
   const k = color + kind;
   if (!mats.has(k)) mats.set(k, new THREE.MeshStandardMaterial(
     kind === 'glass' ? { color, transparent: true, opacity: 0.3, roughness: 0.05, metalness: 0.1, side: THREE.DoubleSide }
     : kind === 'metal' ? { color, roughness: 0.3, metalness: 0.75 }
     : kind === 'gloss' ? { color, roughness: 0.15, metalness: 0.3 }
+    : kind === 'led' ? { color, emissive: color, emissiveIntensity: 1.4, roughness: 0.5 }
+    : kind === 'display' ? { map: displayMap(), emissiveMap: displayMap(), emissive: '#ffffff', emissiveIntensity: 0.85, roughness: 0.25 }
     : { color, roughness: 0.82 }));
   return mats.get(k);
 }
@@ -55,7 +81,7 @@ function grainMat(color, vertical) {
   }
   return texMats.get(k);
 }
-const kindOf = c => (c === 'glass' ? 'glass' : c === 'metal' || c === 'steel' || c === 'mirror' ? 'metal' : c === 'screen' || c === 'black' ? 'gloss' : 'std');
+const kindOf = c => (c === 'glass' ? 'glass' : c === 'display' || c === 'led' ? c : c === 'metal' || c === 'steel' || c === 'alu' || c === 'mirror' ? 'metal' : c === 'screen' || c === 'black' ? 'gloss' : 'std');
 
 function box(w, h, d, x, y, z, material, shadow = true) {
   const m = new THREE.Mesh(BOX, material);
@@ -141,10 +167,11 @@ function buildItem(it) {
     const material = texId && texId !== 'paint' && p.c === 'a' && p.s === 'box' ? texMat(resolveColor('a', it), texId, p.w / getFinish(texId).size, p.h / getFinish(texId).size)
       : grainFam && fam === grainFam ? grainMat(resolveColor(p.c, it), p.h > Math.max(p.w, p.d) * 1.3)
       : mat(resolveColor(p.c, it), kindOf(p.c));
-    const geo = p.s === 'box' ? BOX : p.s === 'sph' ? SPH : p.s === 'disc' ? DISC : cylGeo(p.t ?? 1);
+    const geo = p.s === 'box' ? BOX : p.s === 'rbox' ? rboxGeo(p) : p.s === 'sph' ? SPH : p.s === 'disc' ? DISC : p.s === 'hex' ? HEX : cylGeo(p.t ?? 1);
     const m = new THREE.Mesh(geo, material);
-    m.scale.set(p.w, p.h, p.d); m.position.set(p.x, p.y + p.h / 2, p.z);
-    if (p.ry) m.rotation.y = p.ry;
+    if (p.s !== 'rbox') m.scale.set(p.w, p.h, p.d);
+    m.position.set(p.x, p.y + p.h / 2, p.z);
+    if (p.rx || p.ry || p.rz) m.rotation.set(p.rx || 0, p.ry || 0, p.rz || 0);
     m.castShadow = !material.transparent; m.receiveShadow = true;
     g.add(m);
   }
@@ -396,11 +423,11 @@ export function init3d(el) {
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.9;
   pane.prepend(renderer.domElement);
   scene = new THREE.Scene(); scene.background = new THREE.Color('#eef2f6');
-  camera = new THREE.PerspectiveCamera(50, 1, 0.05, 500);
+  camera = new THREE.PerspectiveCamera(50, 1, 0.02, 500);
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = false; controls.zoomToCursor = true; controls.rotateSpeed = 0.9; // no inertia: the view stops when the mouse stops
   controls.addEventListener('change', () => { if (ptActive) pt.updateCamera(); });
-  controls.maxPolarAngle = Math.PI / 2 - 0.02; controls.minDistance = 0.5; controls.maxDistance = 120;
+  controls.maxPolarAngle = Math.PI / 2 - 0.02; controls.minDistance = 0.08; controls.maxDistance = 120; // close enough to inspect a keyboard
   hemi = new THREE.HemisphereLight(0xffffff, 0xcfc8bb, 1.0);
   sun = new THREE.DirectionalLight(0xfff3dc, 2.4); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
   ground = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#dfe4e8', roughness: 1 }));
@@ -432,7 +459,7 @@ export function init3d(el) {
     if (it && !isSel('item', it.id)) select([{ k: 'item', id: it.id }]); // first click only selects
     else if (it && !it.locked) {
       const p = onFloor(hit.point.y);
-      if (p) { act = { ...act, t: 'drag', py: hit.point.y, off: { x: it.x - p.x, y: it.y - p.y }, moved: false }; controls.enabled = false; cvs.setPointerCapture(e.pointerId); }
+      if (p) { act = { ...act, t: 'drag', py: hit.point.y, off: { x: it.x - p.x, y: it.y - p.y }, moved: false, x0: it.x, y0: it.y, riders: riders([it]).map(r => ({ it: r, x: r.x, y: r.y })) }; controls.enabled = false; cvs.setPointerCapture(e.pointerId); }
     }
   });
   cvs.addEventListener('pointermove', e => {
@@ -442,13 +469,25 @@ export function init3d(el) {
       if (!act.moved && Math.hypot(e.clientX - act.x, e.clientY - act.y) < 4) return;
       cast(e); const p = onFloor(act.py); if (!p) return;
       const g = S.doc.settings.snap, sn = v => (S.prefs.snapGrid ? Math.round(v / g) * g : v);
-      act.it.x = sn(p.x + act.off.x); act.it.y = sn(p.y + act.off.y); act.moved = true; touch();
+      act.it.x = sn(p.x + act.off.x); act.it.y = sn(p.y + act.off.y); act.moved = true;
+      for (const r of act.riders) { r.it.x = r.x + act.it.x - act.x0; r.it.y = r.y + act.it.y - act.y0; }
+      if (sits(act.it)) act.it.elev = surfaceUnder(act.it); // desk-top pieces land on whatever is under them
+      touch();
     }
   });
   cvs.addEventListener('pointerup', e => {
     if (act?.t === 'drag') { controls.enabled = !S.walk; if (act.moved) commit(); }
     else if (act?.t === 'click' && !act.it && Math.hypot(e.clientX - act.x, e.clientY - act.y) < 4) select([]);
     act = null;
+  });
+  cvs.addEventListener('dblclick', e => { // zoom in on a piece
+    if (S.walk || ptActive) return;
+    cast(e);
+    let o = ray.intersectObjects(itemsGroup.children, true)[0]?.object; while (o && !o.userData.itemId) o = o.parent;
+    const it = o && find('item', o.userData.itemId); if (!it) return;
+    const c = new THREE.Vector3(it.x, (it.elev || 0) + it.h / 2, it.y), dir = camera.position.clone().sub(controls.target).normalize();
+    if (dir.y < 0.3) dir.setY(0.3).normalize();
+    controls.target.copy(c); camera.position.copy(c).addScaledVector(dir, Math.max(0.25, Math.hypot(it.w, it.d, it.h) * 1.5)); controls.update();
   });
   const key = e => { if (!S.walk) return; if (/^(Key[WASD]|Arrow|Shift)/.test(e.code)) { walk.keys[e.code] = e.type === 'keydown'; e.preventDefault(); } };
   window.addEventListener('keydown', key); window.addEventListener('keyup', key);

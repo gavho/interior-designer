@@ -2,9 +2,10 @@
 import { S } from './state.js';
 import { obbCorners, convexOverlap, pointInPoly, add, mul, rot, clamp } from './util.js';
 import { getDef } from './catalog.js';
+import { sits } from './ops.js';
 
-const solid = it => !getDef(it.type).flat && it.elev < 1.9;
-const SEATS = ['chair', 'officechair', 'stool', 'bench', 'ottoman'], TABLES = ['dining', 'dining_round', 'desk', 'island', 'counter', 'coffee', 'coffee_round'];
+const solid = it => !getDef(it.type).flat && it.elev < 1.9 && !(sits(it) && it.elev > 0.05); // things standing on furniture are not obstacles
+const SEATS = ['chair', 'officechair', 'taskchair', 'stool', 'bench', 'ottoman'], TABLES = ['dining', 'dining_round', 'desk', 'desk_stand', 'desk_l', 'desk_slim', 'island', 'counter', 'coffee', 'coffee_round'];
 const tucks = (seat, table) => SEATS.includes(seat.type) && TABLES.includes(table.type);
 const footprint = it => it.w * it.d * (it.type === 'cyl' || /round|column$/.test(it.type) ? Math.PI / 4 : 1);
 

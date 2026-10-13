@@ -145,7 +145,7 @@ export function printPlan() { const im = $('printimg'); im.onload = () => { prin
 function helpDialog() {
   const keys = [['V', 'Select / move'], ['W', 'Draw walls'], ['A', 'Curved wall (start, end, then bend)'], ['R', 'Rectangle room'], ['D', 'Door'], ['N', 'Window'], ['M', 'Measure / dimension'], ['T', 'Text label'], ['H or Space-drag', 'Pan'], ['Scroll', 'Zoom'], ['F', 'Zoom to fit'],
     ['Q / E', 'Rotate selection 90° (Shift: 15°)'], ['Arrows', 'Nudge (Shift: larger)'], ['Ctrl+D', 'Duplicate'], ['Ctrl+C / V', 'Copy / paste'], ['Del', 'Delete'], ['Ctrl+Z / Y', 'Undo / redo'], ['Ctrl+A', 'Select all furniture'],
-    ['G', 'Toggle grid snap'], ['1 / 2 / 3', '2D / split / 3D view'], ['Esc', 'Cancel / deselect'], ['Double-click wall', 'Split wall'], ['Double-click room', 'Rename room'], ['Shift while drawing', 'Lock to 45° steps'], ['Alt while dragging', 'Ignore snapping']];
+    ['G', 'Toggle grid snap'], ['1 / 2 / 3', '2D / split / 3D view'], ['Esc', 'Cancel / deselect'], ['Double-click wall', 'Split wall'], ['Double-click in 3D', 'Zoom in on a piece'], ['Double-click room', 'Rename room'], ['Shift while drawing', 'Lock to 45° steps'], ['Alt while dragging', 'Ignore snapping']];
   dialog('Shortcuts & tips', h('div', null, h('div.keys', null, keys.map(([k, d]) => [h('kbd', null, k), h('span', null, d)])),
     h('p.hint', null, 'While drawing a wall, type a length such as 12\'6" or 3.8m and press Enter to place it exactly. Click a piece to select it; a toolbar appears above it with Move, rotate, centre, duplicate and delete. Drag the Move grip (or the piece itself once selected) to move it. In 3D, switch to Walk and use W A S D, or press Photo render for a path-traced image.')));
 }
@@ -206,8 +206,9 @@ function furnishTab() {
       h('div.stack', null, btn('＋ Custom shape', customDialog, { title: 'A box, cylinder or L-shape at any size' }),
         btn('＋ Product from the web', productDialog, { title: 'Paste a product link, photo and dimensions' }),
         btn('＋ Import 3D model', modelDialog, { title: 'GLB / glTF / OBJ file or direct link' }),
-        btn('★ Browse free realistic 3D models', libraryDialog, { cls: 'primary', title: 'Poly Haven library — detailed, textured models, free to use' })),
-      h('p.hint', null, 'Click a piece, then click on the plan to place it. Shift-click places several in a row.')),
+        btn('★ Browse free realistic 3D models', libraryDialog, { cls: 'primary', title: 'Poly Haven library — detailed, textured models, free to use' }),
+        btn('★ Search Sketchfab models', sketchfabDialog, { cls: 'primary', title: 'A very large library of downloadable models: modern furniture, desk setups, appliances' })),
+      h('p.hint', null, 'Click a piece, then click on the plan to place it. Shift-click places several in a row. Desk-setup pieces land on the desk or shelf under them and move with it.')),
   ];
 }
 
@@ -367,8 +368,8 @@ function itemProps(items) {
     h('h2', null, def.cat === 'Custom' ? 'Custom piece' : def.name),
     section(null, row('Name', textInput(it.name, edit(v => (it.name = v || def.name)))),
       def.sizes && row('Standard size', selectInput([['', 'Custom'], ...def.sizes.map((s, i) => [String(i), s[0]])], String(def.sizes.findIndex(s => Math.abs(s[1] - it.w) < 0.02 && Math.abs(s[2] - it.d) < 0.02)).replace('-1', ''), edit(v => { if (v !== '') { it.w = def.sizes[v][1]; it.d = def.sizes[v][2]; } }))),
-      row('Width', lenInput(it.w, edit(v => (it.w = Math.max(0.02, v))))), row('Depth', lenInput(it.d, edit(v => (it.d = Math.max(0.02, v))))), row('Height', lenInput(it.h, edit(v => (it.h = Math.max(0.005, v))))),
-      row('Off floor', lenInput(it.elev || 0, edit(v => (it.elev = Math.max(0, v))))),
+      row('Width', lenInput(it.w, edit(v => (it.w = Math.max(0.02, v))))), row('Depth', lenInput(it.d, edit(v => (it.d = Math.max(0.02, v))))), row('Height', lenInput(it.h, edit(v => { const on = ops.riders([it]); it.h = Math.max(0.002, v); on.forEach(r => (r.elev = ops.surfaceUnder(r))); }))),
+      row('Off floor', lenInput(it.elev || 0, edit(v => { const on = ops.riders([it]), by = Math.max(0, v) - (it.elev || 0); it.elev = Math.max(0, v); on.forEach(r => (r.elev += by)); }))),
       row('Rotation', numInput(Math.round(it.rot * 10) / 10, edit(v => (it.rot = normDeg(v))), { step: 15 }), h('span.unit', null, '°'))),
     section('Position', (() => {
         const g = ops.itemGaps(it), f = (lab, side) => isFinite(g[side]) && h('label', null, lab, lenInput(Math.max(0, g[side]), v => ops.setItemGap(it, side, v)));
@@ -382,7 +383,8 @@ function itemProps(items) {
       (it.tex ?? def.tex) && row('Surface', selectInput(WALL_FINISHES.filter(f => f.id !== 'paint').map(f => [f.id, f.name]), it.tex ?? def.tex, edit(v => (it.tex = v)))),
       def.mat === 'cab' && def.color2 && h('div.presets', null, h('span', null, 'Counter'), COUNTERS.map(([n, c]) => h('button', { title: n, style: { background: c }, onclick: edit(() => (it.color2 = c)) }))),
       (def.color2 || it.color2) && row('Secondary', colorInput(it.color2 || def.color2, live(v => (it.color2 = v)), edit(v => (it.color2 = v)))),
-      h('div.stack', null, check('Mirror', it.flip, edit(v => (it.flip = v))), check('Lock position', it.locked, edit(v => (it.locked = v))))),
+      h('div.stack', null, check('Mirror', it.flip, edit(v => (it.flip = v))), check('Lock position', it.locked, edit(v => (it.locked = v))),
+        check('Rest on furniture', ops.sits(it), edit(v => { it.on = v; if (v) it.elev = ops.surfaceUnder(it); })))),
     section('Shopping', row('Price', numInput(it.price ?? '', edit(v => (it.price = v || undefined)), { step: 0.01, min: 0 })),
       row('Link', textInput(it.url, edit(v => (it.url = v || undefined)), { placeholder: 'https://…', type: 'url' }), it.url && h('a.go', { href: it.url, target: '_blank', rel: 'noopener' }, '↗')),
       it.type === 'product' && row('Photo URL', textInput(it.image, edit(v => (it.image = v)), { placeholder: 'https://…' })),
@@ -587,6 +589,55 @@ async function libraryDialog() {
     h('input.search', { type: 'search', placeholder: 'Search, e.g. sofa, lamp, chair…', oninput: e => { q = e.target.value.trim().toLowerCase(); fill(); } }), chips, info, grid), [], '.wide');
   try { phCatalog ??= await (await fetch('https://api.polyhaven.com/assets?t=models')).json(); fill(); }
   catch { info.textContent = 'Could not reach polyhaven.com. Check your connection and try again.'; }
+}
+
+// Sketchfab: searching is open to everyone; downloading a model needs the user's own (free) API token.
+const SF_KEY = 'id-sketchfab-token';
+function sketchfabDialog() {
+  if (!api3d) { toast('The 3D engine is not loaded (are you offline?)'); return; }
+  const QUICK = ['Office chair', 'Standing desk', 'Monitor', 'Mechanical keyboard', 'Desk setup', 'Bookshelf', 'Modern sofa', 'Floor lamp', 'Potted plant', 'Wall panel', 'Refrigerator', 'Coffee machine'];
+  let q = 'office chair', lic = '', busy = false, seq = 0, token = '';
+  try { token = localStorage.getItem(SF_KEY) || ''; } catch {}
+  const grid = h('div.grid.ph'), info = h('p.hint', null, ''), mb = n => `${(n / 1e6).toFixed(n < 1e7 ? 1 : 0)} MB`;
+  const search = async () => {
+    const mine = ++seq; info.textContent = 'Searching…';
+    try {
+      const r = await fetch(`https://api.sketchfab.com/v3/search?type=models&downloadable=true&count=24&max_face_count=150000&q=${encodeURIComponent(q)}${lic ? '&license=' + lic : ''}`);
+      const list = (await r.json()).results || [];
+      if (mine !== seq) return;
+      info.textContent = list.length ? `${list.length} best matches. ${token ? 'Click one to bring it into your plan.' : 'Add your API token below to import with one click, or click a model to open its page and download the GLB yourself.'}` : 'Nothing found. Try a simpler search.';
+      grid.replaceChildren(...list.map(m => h('button.card', { title: `${m.name} — by ${m.user?.displayName}, ${m.license?.label || 'see page for licence'}`, onclick: () => pick(m) },
+        h('img', { loading: 'lazy', src: (m.thumbnails?.images?.find(i => i.width <= 256) || m.thumbnails?.images?.[0])?.url, alt: m.name }), h('b', null, m.name),
+        h('small', null, `${m.license?.label?.replace('CC ', '') || '?'}${m.archives?.glb?.size ? ' · ' + mb(m.archives.glb.size) : ''}`))));
+    } catch { if (mine === seq) info.textContent = 'Could not reach sketchfab.com. Check your connection and try again.'; }
+  };
+  const pick = async m => {
+    if (!token) { window.open(m.viewerUrl, '_blank', 'noopener'); return; }
+    if (busy) return;
+    if (m.archives?.glb?.size > 80e6 && !confirm(`“${m.name}” is ${mb(m.archives.glb.size)}. Large models make the plan slow to save and open. Import anyway?`)) return;
+    busy = true; info.textContent = `Downloading “${m.name}”…`;
+    try {
+      const r = await fetch(`https://api.sketchfab.com/v3/models/${m.uid}/download`, { headers: { Authorization: `Token ${token}` } });
+      if (r.status === 401 || r.status === 403) throw new Error('token');
+      const glb = (await r.json()).glb?.url; if (!glb) throw new Error('format');
+      const aid = uid('as'), credit = `${m.name} by ${m.user?.displayName} (${m.license?.label || 'see page'}), via Sketchfab`;
+      S.assets[aid] = { name: m.name, kind: 'glb', data: await readAsDataURL(await (await fetch(glb)).blob()), credit };
+      const sz = await api3d.measureModel(aid);
+      S.assets[aid].thumb = sz.thumb;
+      place(ops.makeItem('model', { assetId: aid, name: m.name, w: sz.w, d: sz.d, h: sz.h, url: m.viewerUrl, notes: credit }));
+      close(); toast(`${m.name} ready (${L(sz.w)} × ${L(sz.d)} × ${L(sz.h)}) — click on the plan to place it, then check its size`, 5000);
+    } catch (e) { console.error(e); info.textContent = e.message === 'token' ? 'Sketchfab did not accept that API token. Check it and try again.' : e.message === 'format' ? 'That model has no GLB download. Try another one.' : 'That model could not be downloaded. Try another one.'; }
+    busy = false;
+  };
+  const quick = h('div.chips', null, QUICK.map(t => h('button', { onclick: () => { q = t.toLowerCase(); box.value = t; search(); } }, t)));
+  const box = h('input.search', { type: 'search', value: q, placeholder: 'Search, e.g. minimal desk, monitor arm, pegboard…', onchange: e => { q = e.target.value.trim(); search(); } });
+  const close = dialog('Sketchfab models', h('div', null,
+    h('p.hint', null, 'Hundreds of thousands of downloadable models from Sketchfab artists. Most are licensed CC Attribution: credit the author if you publish renders (the credit is saved in each piece’s notes). Models vary in scale, so check the size after placing.'),
+    box, quick,
+    h('div.form', null, row('Licence', selectInput([['', 'Any downloadable'], ['cc0', 'CC0 (no credit needed)'], ['by', 'CC Attribution']], lic, v => { lic = v; search(); })),
+      row('API token', textInput(token, v => { token = v.trim(); try { token ? localStorage.setItem(SF_KEY, token) : localStorage.removeItem(SF_KEY); } catch {} search(); }, { type: 'password', placeholder: 'From sketchfab.com → Settings → Password & API' }))),
+    info, grid), [], '.wide');
+  search();
 }
 
 export function initUI() {

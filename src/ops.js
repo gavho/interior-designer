@@ -1,7 +1,7 @@
 // Editing operations on the document. Each one mutates S.doc and commits an undo step.
 import { S, commit, select, selOf, find } from './state.js';
 import { uid, add, sub, mul, dist, rot, norm, dot, perp, projectOnSegment, lineIntersect, normDeg, pointInPoly } from './util.js';
-import { getDef } from './catalog.js';
+import { getDef, partsFor } from './catalog.js';
 import { getFloor } from './materials.js';
 
 const EPS = 0.012;
@@ -12,6 +12,30 @@ export function makeItem(type, extra = {}) {
   return { id: uid('it'), type, name: d.name, x: 0, y: 0, rot: 0, w: d.w, d: d.d, h: d.h, elev: d.elev || 0, color: d.color, ...(d.color2 ? { color2: d.color2 } : {}), ...extra };
 }
 export function addItem(item) { S.doc.items.push(item); select([{ k: 'item', id: item.id }]); commit(); return item; }
+
+// ---- pieces that rest on other furniture (keyboards, monitors, plants on shelves) ----
+export const sits = it => it.on ?? !!getDef(it.type).on;
+/** Height of whatever is under a small piece (desk, shelf, monitor stand), so it lands on that instead of the floor. */
+export function surfaceUnder(it) {
+  const cap = Math.max(1.3, (it.elev || 0) + 0.05); // reach a higher shelf by typing its "Off floor" height once
+  let top = 0;
+  for (const o of S.doc.items) {
+    const def = getDef(o.type);
+    if (o.id === it.id || def.flat || (sits(o) && !def.surf)) continue;
+    const l = rot(sub(it, o), -o.rot);
+    if (Math.abs(l.x) > o.w / 2 || Math.abs(l.y) > o.d / 2) continue;
+    const parts = partsFor(o), tops = parts.length ? parts.filter(p => Math.abs(l.x - p.x) <= p.w / 2 && Math.abs(l.y - p.z) <= p.d / 2).map(p => p.y + p.h) : [o.h];
+    for (const t of tops) if (o.elev + t <= cap && o.elev + t > top) top = o.elev + t;
+  }
+  return top;
+}
+/** Pieces resting on any of `bases`, so they travel with the desk or shelf they stand on. */
+export function riders(bases) {
+  return S.doc.items.filter(it => sits(it) && !it.locked && !bases.includes(it) && bases.some(b => {
+    const l = rot(sub(it, b), -b.rot);
+    return Math.abs(l.x) <= b.w / 2 && Math.abs(l.y) <= b.d / 2 && it.elev > b.elev + 0.05 && it.elev <= b.elev + b.h + 0.4;
+  }));
+}
 
 export function addWall(a, b, extra = {}) {
   const w = { id: uid('w'), a: { x: a.x, y: a.y }, b: { x: b.x, y: b.y }, thickness: S.doc.settings.wallThickness, height: S.doc.settings.wallHeight, ...extra };
@@ -88,8 +112,8 @@ export function rotateSelection(by) {
   const items = selOf('item').filter(i => !i.locked);
   if (!items.length) return;
   const c = mul(items.reduce((s, i) => add(s, i), { x: 0, y: 0 }), 1 / items.length);
-  for (const it of items) {
-    if (items.length > 1) { const p = add(c, rot(sub(it, c), by)); it.x = p.x; it.y = p.y; }
+  for (const it of [...items, ...riders(items)]) {
+    if (items.length > 1 || it !== items[0]) { const p = add(c, rot(sub(it, c), by)); it.x = p.x; it.y = p.y; }
     it.rot = normDeg(it.rot + by);
   }
   commit();
@@ -98,7 +122,7 @@ export function rotateSelection(by) {
 export function nudge(dx, dy) {
   const items = selOf('item').filter(i => !i.locked), labels = selOf('label'), walls = selOf('wall');
   if (!items.length && !labels.length && !walls.length) return;
-  for (const o of [...items, ...labels]) { o.x += dx; o.y += dy; }
+  for (const o of [...items, ...riders(items), ...labels]) { o.x += dx; o.y += dy; }
   const pts = [];
   for (const w of walls) for (const e of ['a', 'b']) if (!pts.some(p => dist(p, w[e]) < EPS)) pts.push({ ...w[e] });
   for (const p of pts) moveVertex(p, add(p, { x: dx, y: dy }));

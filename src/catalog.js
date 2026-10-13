@@ -3,11 +3,8 @@
 // piece can be resized freely. Local axes: x = width, y = up, z = depth (back of the piece is -z).
 import { shade, rad } from './util.js';
 
-const bx = (x, y, z, w, h, d, c, o) => ({ s: 'box', x, y, z, w, h, d, c, ...o });
-const cy = (x, y, z, dia, h, c, o) => ({ s: 'cyl', x, y, z, w: dia, h, d: dia, c, ...o });
-const sp = (x, y, z, w, h, d, c) => ({ s: 'sph', x, y, z, w, h, d, c });
-const disc = (x, y, z, dia, t, c) => ({ s: 'disc', x, y, z, w: dia, h: dia, d: t, c }); // round face pointing forward
-const legs = (w, d, h, t, c, i = 0.03) => [[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sz]) => bx(sx * (w / 2 - i - t / 2), 0, sz * (d / 2 - i - t / 2), t, h, t, c));
+import { bx, cy, sp, disc, legs } from './parts.js';
+import { OFFICE, DESK, MORE } from './catalog-extra.js';
 
 const sofa = n => (w, d, h) => {
   const arm = Math.min(0.2, w * 0.14), back = Math.min(0.22, d * 0.26), sh = Math.min(0.43, h * 0.55), base = 0.1, iw = w - 2 * arm;
@@ -131,6 +128,7 @@ const DEFS = [
   { id: 'desk', name: 'Desk', cat: 'Office', w: 1.4, d: 0.7, h: 0.75, color: '#b89468', mat: 'wood', clear: 0.75, build: (w, d, h) => [...table(w, d, h), ...drawers(3)(0.4, d - 0.1, h - 0.06).filter(p => p.c !== 'dark').map(p => ({ ...p, x: p.x + w / 2 - 0.26 }))] },
   { id: 'officechair', name: 'Office chair', cat: 'Office', w: 0.62, d: 0.62, h: 1.0, color: '#33373d', color2: '#18181a', mat: 'fabric', build: (w, d, h) => [...[0, 72, 144, 216, 288].map(a => bx(Math.sin(rad(a)) * w * 0.22, 0.03, Math.cos(rad(a)) * d * 0.22, 0.05, 0.03, w * 0.44, 'b', { ry: rad(a) })), cy(0, 0.05, 0, 0.05, 0.38, 'metal'), bx(0, 0.43, 0.02, w * 0.8, 0.08, d * 0.78, 'a'), bx(0, 0.56, -d / 2 + 0.08, w * 0.74, h - 0.56, 0.07, 'a'), bx(-w / 2 + 0.03, 0.6, 0, 0.05, 0.03, d * 0.45, 'b'), bx(w / 2 - 0.03, 0.6, 0, 0.05, 0.03, d * 0.45, 'b')] },
   { id: 'filing', name: 'Filing cabinet', cat: 'Office', w: 0.42, d: 0.6, h: 0.72, color: '#9aa0a6', build: drawers(3) },
+  ...OFFICE, ...DESK,
 
   // ---------- Laundry & utility ----------
   { id: 'washer', name: 'Washer', cat: 'Utility', w: 0.68, d: 0.72, h: 0.98, color: '#f4f4f2', clear: 0.9, build: (w, d, h) => washer(0, h)(w, d) },
@@ -144,8 +142,8 @@ const DEFS = [
     sizes: [["5' × 8'", 2.44, 1.52], ["6' × 9'", 2.74, 1.83], ["8' × 10'", 3.05, 2.44], ["9' × 12'", 3.66, 2.74]] },
   { id: 'rug_round', name: 'Round rug', cat: 'Decor', w: 1.8, d: 1.8, h: 0.015, color: '#8fa3a8', mat: 'accent', flat: true, build: (w, d) => [{ ...cy(0, 0, 0, w, 0.012, 'a'), d }, { ...cy(0, 0.012, 0, w * 0.82, 0.003, 'a+'), d: d * 0.82 }] },
   { id: 'plant', name: 'Floor plant', cat: 'Decor', w: 0.6, d: 0.6, h: 1.3, color: '#4f8a4a', color2: '#c9b79c', build: plant },
-  { id: 'plant_small', name: 'Small plant', cat: 'Decor', w: 0.28, d: 0.28, h: 0.4, color: '#5f9a58', color2: '#e3ded4', build: plant },
-  { id: 'tablelamp', name: 'Table lamp', cat: 'Decor', w: 0.3, d: 0.3, h: 0.5, elev: 0.56, color: '#efe6d2', color2: '#b08456', mat: 'accent', build: lamp },
+  { id: 'plant_small', name: 'Small plant', cat: 'Decor', on: 1, w: 0.28, d: 0.28, h: 0.4, color: '#5f9a58', color2: '#e3ded4', build: plant },
+  { id: 'tablelamp', name: 'Table lamp', cat: 'Decor', on: 1, w: 0.3, d: 0.3, h: 0.5, elev: 0.56, color: '#efe6d2', color2: '#b08456', mat: 'accent', build: lamp },
   { id: 'pendant', name: 'Pendant light', cat: 'Decor', w: 0.45, d: 0.45, h: 0.7, elev: 1.9, color: '#d9b25f', color2: '#2b2d31', mat: 'accent', build: (w, d, h) => [cy(0, 0.25, 0, 0.012, h - 0.25, 'b'), cy(0, 0, 0, w, 0.25, 'a', { t: 0.35 })] },
   { id: 'art', name: 'Wall art', cat: 'Wall decor', w: 0.9, d: 0.04, h: 0.6, elev: 1.25, color: '#c98f6b', color2: '#2b2d31', mat: 'accent', mount: 'wall', build: (w, d, h) => [bx(0, 0, 0, w, h, d * 0.7, 'b'), bx(0, 0.04, d * 0.35, w - 0.08, h - 0.08, 0.004, 'white'), bx(0, 0.09, d * 0.35 + 0.002, w - 0.18, h - 0.18, 0.004, 'a')] },
   { id: 'shelf', name: 'Wall shelf', cat: 'Wall decor', w: 0.9, d: 0.24, h: 0.04, elev: 1.5, color: '#b08456', mat: 'wood', mount: 'wall', build: (w, d, h) => [bx(0, 0, 0, w, h, d, 'a')] },
@@ -172,6 +170,8 @@ const DEFS = [
   { id: 'planter', name: 'Planter box', cat: 'Structure', w: 1.2, d: 0.4, h: 0.9, color: '#5f9a58', color2: '#7a7570', build: (w, d, h) => [bx(0, 0, 0, w, h * 0.45, d, 'b'), sp(-w * 0.25, h * 0.35, 0, w * 0.5, h * 0.65, d * 1.1, 'a'), sp(w * 0.2, h * 0.4, 0, w * 0.55, h * 0.6, d * 1.1, 'a+')] },
   { id: 'pooltable', name: 'Pool table', cat: 'Structure', w: 2.6, d: 1.45, h: 0.8, color: '#2f7a4f', color2: '#5a3d28', build: (w, d, h) => [...legs(w, d, h - 0.2, 0.14, 'b', 0.08), bx(0, h - 0.2, 0, w, 0.2, d, 'b'), bx(0, h, 0, w - 0.2, 0.004, d - 0.2, 'a')] },
 
+  ...MORE,
+
   // ---------- Custom primitives (also the base for imported pieces) ----------
   { id: 'box', name: 'Custom box', cat: 'Custom', w: 1, d: 0.6, h: 0.8, color: '#b9b2a6', build: (w, d, h) => [bx(0, 0, 0, w, h, d, 'a')] },
   { id: 'cyl', name: 'Custom cylinder', cat: 'Custom', w: 0.8, d: 0.8, h: 0.8, color: '#b9b2a6', build: (w, d, h) => [{ ...cy(0, 0, 0, w, h, 'a'), d }] },
@@ -185,7 +185,7 @@ export const CATEGORIES = [...new Set(DEFS.map(d => d.cat))];
 const byId = Object.fromEntries(DEFS.map(d => [d.id, d]));
 export const getDef = type => byId[type] || byId.box;
 
-const NAMED = { metal: '#b9bdc3', steel: '#c9ccd1', dark: '#2b2d31', black: '#141416', white: '#f6f5f2', glass: '#a9d4e6', screen: '#0c1016', mirror: '#cfe3ea' };
+const NAMED = { metal: '#b9bdc3', steel: '#c9ccd1', alu: '#c5c8cc', display: '#3b5f8f', led: '#fff1d0', dark: '#2b2d31', black: '#141416', white: '#f6f5f2', glass: '#a9d4e6', screen: '#0c1016', mirror: '#cfe3ea' };
 export function resolveColor(c, item) {
   if (c[0] === '#') return c;
   if (NAMED[c]) return NAMED[c];
@@ -227,9 +227,10 @@ export function drawSymbol(ctx, item, lw, imageSrc, redraw) {
     if (p.c === 'glass') ctx.globalAlpha *= 0.45;
     ctx.fillStyle = resolveColor(p.c, item);
     ctx.beginPath();
-    if (p.s === 'box' || p.s === 'disc') ctx.rect(-p.w / 2, -p.d / 2, p.w, p.d);
-    else { const k = p.s === 'cyl' && p.t > 1 ? p.t : 1; ctx.ellipse(0, 0, (p.w / 2) * k, (p.d / 2) * k, 0, 0, Math.PI * 2); }
-    ctx.fill(); ctx.stroke();
+    if (p.s === 'cyl' || p.s === 'sph') { const k = p.s === 'cyl' && p.t > 1 ? p.t : 1; ctx.ellipse(0, 0, (p.w / 2) * k, (p.d / 2) * k, 0, 0, Math.PI * 2); }
+    else ctx.rect(-p.w / 2, -p.d / 2, p.w, p.d);
+    ctx.fill();
+    if (Math.max(p.w, p.d) > lw * 4) ctx.stroke(); // outlines would swamp fine detail such as keyboard keys
     ctx.restore();
   }
 }
