@@ -6,7 +6,7 @@ import { rad } from './util.js';
 const TOP = 0.028; // desktop thickness
 
 // ---------- desks & seating ----------
-const standDesk = (w, d, h) => {
+export const standDesk = (w, d, h) => {
   const lx = w / 2 - Math.min(0.2, w * 0.14), up = h - TOP - 0.04, split = 0.025 + up * 0.56;
   return [rb(0, h - TOP, 0, w, TOP, d, 'a', 0.006), bx(0, up, 0, 2 * lx, 0.035, 0.08, 'b'), bx(w / 2 - 0.24, h - TOP - 0.02, d / 2 - 0.035, 0.11, 0.02, 0.05, 'dark'),
     ...[-1, 1].flatMap(s => [rb(s * lx, 0, 0, 0.075, 0.025, d * 0.92, 'b', 0.008), bx(s * lx, 0.025, 0, 0.08, split - 0.025, 0.055, 'b'), bx(s * lx, split, 0, 0.066, Math.max(0.01, up - split), 0.042, 'b+'), bx(s * lx, up, 0, 0.05, 0.04, d * 0.8, 'b')])];

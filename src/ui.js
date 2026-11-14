@@ -465,6 +465,7 @@ function itemProps(items) {
     section('Finish', row(def.color2 ? 'Main' : 'Colour', colorInput(it.color, live(v => (it.color = v)), edit(v => (it.color = v)))),
       def.colors?.length && h('div.presets.retail', null, h('span', null, 'Retailer colours'), def.colors.map(([n, c]) => h('button.named', { title: n, onclick: edit(() => { it.color = c; if (def.color2 === def.color) it.color2 = c; it.colorName = n; }) }, h('i', { style: { background: c } }), n))),
       def.mat === 'cab' && check('Flat-panel doors (modern)', it.slab, edit(v => (it.slab = v))),
+      def.heights && h('div.presets.retail', null, h('span', null, 'Desk height'), def.heights.map(([n, v]) => h('button.named', { onclick: edit(() => { const on = ops.riders([it]); it.h = v; on.forEach(r => (r.elev = ops.surfaceUnder(r))); }) }, n))),
       it.type === 'allewie_bed' && check('Show mattress', !it.noMattress, edit(v => (it.noMattress = !v))),
       it.type === 'shintenchi_island' && check('Leaf raised', it.leafDown !== true, edit(v => (it.leafDown = !v))),
       it.type !== 'model' && !(it.tex ?? def.tex) && h('div.presets', null, h('span', null, 'Wood'), WOODS.map(([n, c]) => h('button', { title: n, style: { background: c }, onclick: edit(() => { if (def.mat === 'bed' || def.mat === 'fabric') it.color2 = c; else it.color = c; it.grain = true; }) }))),

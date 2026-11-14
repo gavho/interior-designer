@@ -4,7 +4,7 @@
 import { shade, rad } from './util.js';
 
 import { bx, rb, cy, sp, disc, legs } from './parts.js';
-import { OFFICE, DESK, MORE } from './catalog-extra.js';
+import { OFFICE, DESK, MORE, standDesk } from './catalog-extra.js';
 
 const sofa = n => (w, d, h) => {
   const arm = Math.min(0.2, w * 0.14), back = Math.min(0.22, d * 0.26), sh = Math.min(0.43, h * 0.55), base = 0.1, iw = w - 2 * arm;
@@ -177,6 +177,9 @@ const DEFS = [
   { id: 'tribesigns_desk', name: 'Tribesigns 63" computer desk', cat: 'My picks', w: 63 * IN, d: 31.5 * IN, h: 29.53 * IN, color: '#7a4e2d', color2: '#1b1b1d', build: uFrameDesk,
     colors: [['Rustic brown / black', '#7a4e2d']],
     note: 'Listed size: 63" × 31.5" × 29.53" H; two-tone top (15.75" wood ends, 31.5" black centre), 1.97" square black metal legs.' },
+  { id: 'amazon_standdesk', name: 'Amazon Basics electric standing desk 47"', cat: 'My picks', w: 47.3 * IN, d: 24 * IN, h: 28.4 * IN, color: '#6e4a33', color2: '#1c1c1e', mat: 'wood', clear: 0.75, build: standDesk,
+    colors: [['Black / Walnut effect', '#6e4a33']], heights: [['Sitting · 28.4"', 28.4 * IN], ['Standing · 46.2"', 46.2 * IN]],
+    note: 'Listed size: 47.3" W × 24" D; adjusts from 28.4" to 46.2" high (memory buttons, electronic display). Use the height buttons below or type any height in that range.' },
   { id: 'dorian_tv', name: 'Meyer Cross Dorian 58" TV stand', cat: 'My picks', w: 58 * IN, d: 15.75 * IN, h: 16 * IN, color: '#f3f1ec', color2: '#c99d6e', build: mediaStand,
     url: 'https://www.homedepot.com/pep/Meyer-Cross-Dorian-58-in-Alder-White-TV-Stand-Fits-TV-s-up-to-65-in-TV2306/333200763',
     colors: [['Alder White', '#f3f1ec']],
