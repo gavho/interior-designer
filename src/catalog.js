@@ -71,6 +71,47 @@ const modularL = (w, d, h, it = {}) => {
     rb(-w / 2 + bk / 2, sh - 0.02, z0 + bk + (md - bk) / 2, bk, (h - sh) * 0.62, md - bk - g, 'a+', 0.1), rb(w / 2 - bk / 2, sh - 0.02, z0 + bk + (md - bk) / 2, bk, (h - sh) * 0.62, md - bk - g, 'a+', 0.1));
   return out;
 };
+// Upholstered lift-up storage bed: 12" platform, wingback headboard with three horizontal channels; optional queen mattress.
+const wingBed = (w, d, h, it = {}) => {
+  const fh = 0.305, hbT = 0.09, wing = 0.1, z0 = -d / 2, ch = Math.min(0.61, h - fh), out = [
+    rb(0, 0, z0 + hbT + (d - hbT) / 2, w - 0.01, fh, d - hbT, 'a', 0.025), bx(0, fh - 0.01, z0 + hbT + (d - hbT) / 2, w - 0.08, 0.012, d - hbT - 0.08, 'a-'),
+    rb(0, 0, z0 + hbT / 2, w - 2 * wing + 0.02, h - 0.01, hbT, 'a', 0.02),
+    rb(-w / 2 + wing / 2, 0, z0 + 0.12, wing, h, 0.24, 'a', 0.045), rb(w / 2 - wing / 2, 0, z0 + 0.12, wing, h, 0.24, 'a', 0.045)];
+  for (let i = 0; i < 3; i++) out.push(rb(0, h - ch + (ch / 3) * i + 0.006, z0 + hbT + 0.012, w - 2 * wing - 0.02, ch / 3 - 0.012, 0.035, 'a+', 0.016));
+  if (!it.noMattress) out.push(rb(0, fh, z0 + hbT + 0.04 + 1.016, Math.min(1.524, w - 0.04), 0.254, Math.min(2.032, d - hbT - 0.06), 'white', 0.05));
+  return out;
+};
+// Fluted nightstand: rounded top, open shelf, two fluted drawers with gold bar pulls, plinth.
+const flutedStand = (w, d, h) => {
+  const t = 0.022, pl = 0.06, dh = (h - pl - 0.2) / 2, out = [bx(0, 0, -0.01, w - 0.03, pl, d - 0.04, 'a-'),
+    rb(-w / 2 + t / 2 + 0.01, 0, 0, t + 0.02, h - 0.04, d, 'a', 0.01), rb(w / 2 - t / 2 - 0.01, 0, 0, t + 0.02, h - 0.04, d, 'a', 0.01), rb(0, h - 0.06, 0, w, 0.06, d, 'a', 0.028),
+    bx(0, pl, -d / 2 + 0.01, w - 0.04, h - pl - 0.05, 0.012, 'a-'), bx(0, pl + 2 * dh + 0.005, 0.005, w - 0.06, 0.018, d - 0.03, 'a')];
+  for (let k = 0; k < 2; k++) {
+    const y = pl + 0.004 + k * dh, n = Math.round((w - 0.08) / 0.016), fw = (w - 0.08) / n;
+    out.push(bx(0, y, d / 2 - 0.02, w - 0.07, dh - 0.008, 0.02, 'a-'));
+    for (let i = 0; i < n; i++) out.push(cy(-w / 2 + 0.04 + fw * (i + 0.5), y + 0.004, d / 2 - 0.004, fw * 0.95, dh - 0.016, 'a'));
+    out.push(bx(0, y + dh - 0.04, d / 2 + 0.012, Math.min(0.1, w * 0.25), 0.012, 0.016, '#c9a54a'));
+  }
+  out.push(bx(-w / 2 + 0.04, h - 0.062, -d / 2 + 0.06, 0.07, 0.004, 0.07, 'dark')); // charging pad
+  return out;
+};
+// Desk with a two-tone top (wood ends, black centre panel) on black U-frame legs.
+const uFrameDesk = (w, d, h) => {
+  const tt = 0.025, lg = 0.05, top = h - tt, out = [bx(-w / 2 + w / 8, top, 0, w / 4, tt, d, 'a'), bx(w / 2 - w / 8, top, 0, w / 4, tt, d, 'a'), bx(0, top, 0, w / 2, tt, d, '#1d1d1f')];
+  for (const sx of [-1, 1]) {
+    const x = sx * (w / 2 - 0.06);
+    out.push(bx(x, 0, -d / 2 + 0.05, lg, top, lg, 'b'), bx(x, 0, d / 2 - 0.05, lg, top, lg, 'b'), bx(x, 0.06, 0, lg, 0.04, d - 0.1, 'b'), bx(x, top - 0.05, 0, lg * 0.8, 0.05, d - 0.1, 'b'));
+  }
+  out.push(bx(0, top - 0.05, -d / 2 + 0.05, w - 0.12, 0.05, 0.02, 'b'));
+  return out;
+};
+// Low TV stand: two doors either side of open media shelves, short legs.
+const mediaStand = (w, d, h) => {
+  const lg = 0.06, cw = w * 0.3, out = [...legs(w, d, lg, 0.04, 'a-'), bx(0, lg, 0, w, h - lg, d - 0.01, 'a'), bx(0, h - 0.02, 0, w + 0.01, 0.02, d, 'a+'),
+    bx(0, lg + 0.02, d / 2 - 0.02, w - 2 * cw - 0.02, h - lg - 0.05, 0.02, 'dark'), bx(0, lg + (h - lg) / 2, d / 2 - 0.01, w - 2 * cw - 0.03, 0.015, 0.02, 'a')];
+  for (const sx of [-1, 1]) out.push(bx(sx * (w / 2 - cw / 2), lg + 0.015, d / 2 - 0.004, cw - 0.025, h - lg - 0.045, 0.012, 'b'), bx(sx * (w / 2 - cw + 0.04), lg + (h - lg) / 2 - 0.04, d / 2 + 0.008, 0.012, 0.08, 0.015, 'metal'));
+  return out;
+};
 const table = (w, d, h) => [bx(0, h - 0.04, 0, w, 0.04, d, 'a'), ...legs(w, d, h - 0.04, Math.min(0.06, w * 0.08), 'a-')];
 const roundTable = (w, d, h) => [{ ...cy(0, h - 0.04, 0, w, 0.04, 'a'), d }, cy(0, 0.03, 0, Math.min(0.12, w * 0.15), h - 0.07, 'a-'), { ...cy(0, 0, 0, w * 0.5, 0.03, 'a-'), d: d * 0.5 }];
 const chair = (w, d, h) => { const s = Math.min(0.45, h * 0.5); return [...legs(w, d, s, 0.035, 'b'), bx(0, s, 0, w, 0.06, d, 'a'), bx(0, s + 0.06, -d / 2 + 0.025, w, h - s - 0.06, 0.05, 'a')]; };
@@ -125,6 +166,21 @@ const DEFS = [
     url: 'https://www.livingspaces.com/pdp-zone-cream-4-piece-modular-sectional-with-2-corners-1-armless-chair-ottoman-320081',
     colors: [['Cream (SKU 320081)', '#ece4d4'], ['Green (SKU 357981)', '#7f8a6a'], ['Blue (SKU 319543)', '#7d91a6']],
     note: 'Listed size: 123.62" W × 85.82" D × 36.22" H; seat 7.87" high; 18" interior back. Two 43.3" corners + armless chair along the back, ottoman in front of one corner (switch sides under Chaise side). Swatch colours are approximate.' },
+  { id: 'allewie_bed', name: 'Allewie queen lift-up storage bed', cat: 'My picks', w: 63 * IN, d: 84.25 * IN, h: 44.5 * IN, color: '#f1efe9', mat: 'bed', build: wingBed,
+    url: 'https://a.co/d/004ln3E1',
+    colors: [['White', '#f1efe9'], ['Grey', '#9d9a95'], ['Beige', '#e6dcc6']],
+    note: 'Listed size: 84.25" L × 63" W × 44.5" H; 12" platform, 24" channel headboard above it, 10.8" underbed storage, fits a 60" × 80" queen mattress. Untick "Show mattress" for the bare frame. Swatch colours are approximate.' },
+  { id: 'decofy_nightstand', name: 'Decofy fluted nightstand', cat: 'My picks', w: 19.6 * IN, d: 15.5 * IN, h: 24 * IN, color: '#d2b07a', build: flutedStand,
+    url: 'https://a.co/d/0i5KghFd',
+    colors: [['Oak', '#d2b07a']],
+    note: 'Listed size: 19.6" W × 15.5" D × 24" H (sold as a set of 2: place one each side of the bed). Open shelf, two fluted drawers, charging station.' },
+  { id: 'tribesigns_desk', name: 'Tribesigns 63" computer desk', cat: 'My picks', w: 63 * IN, d: 31.5 * IN, h: 29.53 * IN, color: '#7a4e2d', color2: '#1b1b1d', build: uFrameDesk,
+    colors: [['Rustic brown / black', '#7a4e2d']],
+    note: 'Listed size: 63" × 31.5" × 29.53" H; two-tone top (15.75" wood ends, 31.5" black centre), 1.97" square black metal legs.' },
+  { id: 'dorian_tv', name: 'Meyer Cross Dorian 58" TV stand', cat: 'My picks', w: 58 * IN, d: 15.75 * IN, h: 16 * IN, color: '#f3f1ec', color2: '#c99d6e', build: mediaStand,
+    url: 'https://www.homedepot.com/pep/Meyer-Cross-Dorian-58-in-Alder-White-TV-Stand-Fits-TV-s-up-to-65-in-TV2306/333200763',
+    colors: [['Alder White', '#f3f1ec']],
+    note: 'Listed size: 58" W × 15.75" D × 16" H, for TVs up to 65". Door and shelf layout is approximate: Home Depot could not be read from here.' },
   { id: 'shintenchi_island', name: 'Shintenchi rolling kitchen island with drop leaf', cat: 'My picks', w: 39.8 * IN, d: 24.8 * IN, h: 35.6 * IN, color: '#f4f3ef', color2: '#f4f3ef', clear: 0.9, build: islandCart,
     url: 'https://www.amazon.com/dp/B0GY8N9MWN',
     colors: [['White', '#f4f3ef'], ['Black', '#2a2a2b']],
