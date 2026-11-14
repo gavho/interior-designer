@@ -17,6 +17,20 @@ It can be hosted as-is on GitHub Pages by serving the repository root.
 The app opens with a sample two-bedroom apartment traced from `samples/next-chicago-il-floorplan.png`.
 Work is autosaved in the browser; use **File → Save project** to keep a `.json` copy.
 
+### On an iPad (or any tablet)
+
+The app is touch-ready and can be hosted for free on GitHub Pages:
+
+1. On GitHub open **Settings → Pages**, choose **Deploy from a branch**, pick the branch and **/ (root)**, and save.
+2. Open the published link (e.g. `https://<user>.github.io/interior-designer/`) in Safari.
+3. Tap **Share → Add to Home Screen** to launch it full-screen like an app.
+
+Touch gestures: tap to select (then drag to move), drag on empty floor to box-select, **pinch** to zoom,
+**two-finger drag** to pan, **long-press** for the actions menu, and **double-tap** to rename a room, split a wall
+or (in 3D) zoom to a piece. Drawing tools follow your finger and place on lift; tap **✓ Done** to finish.
+In portrait, **☰ Panel** and **Properties** slide the side panels in. Walk mode shows on-screen arrows.
+Projects autosave in Safari; use **File → Save project** to keep a copy in Files.
+
 ## What it does
 
 **Build**
