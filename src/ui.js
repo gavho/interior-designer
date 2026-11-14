@@ -513,7 +513,7 @@ function openingProps(o) {
   const door = o.type === 'door', w = find('wall', o.wallId), g = S.wallGeom.get(w.id);
   return [
     h('h2', null, door ? 'Door' : 'Window'),
-    section(null, row('Style', selectInput(door ? [['single', 'Single swing'], ['double', 'Double swing'], ['sliding', 'Sliding glass'], ['bifold', 'Bifold'], ['opening', 'Cased opening']] : [['standard', 'Standard (divided)'], ['picture', 'Picture (single pane)'], ['curtain', 'Window wall (dark mullions)']], o.style, edit(v => (o.style = v)))),
+    section(null, row('Style', selectInput(door ? [['single', 'Single swing'], ['double', 'Double swing'], ['glass', 'Glass swing (window wall)'], ['sliding', 'Sliding glass'], ['bifold', 'Bifold'], ['opening', 'Cased opening']] : [['standard', 'Standard (divided)'], ['picture', 'Picture (single pane)'], ['curtain', 'Window wall (dark mullions)']], o.style, edit(v => (o.style = v)))),
       row('Width', lenInput(o.width, edit(v => (o.width = Math.min(Math.max(0.2, v), g.len - 0.1))))), row('Height', lenInput(o.height, edit(v => (o.height = Math.max(0.2, v))))),
       !door && row('Sill height', lenInput(o.sill, edit(v => (o.sill = Math.max(0, v))))),
       row('From wall start', lenInput(o.pos - o.width / 2, edit(v => (o.pos = v + o.width / 2)), false))),

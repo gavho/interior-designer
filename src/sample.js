@@ -52,7 +52,7 @@ export function buildSample(mine = false) {
   open('bed1S', 359 - 312, 'door', { side: -1, width: 0.86 }); open('liveS', 347.5 - 8, 'door', { hinge: 'right', width: 0.82 });
   open('hallS', 555.5 - 437.5, 'door', { hinge: 'right', width: 0.82 }); open('hallS', 721 - 437.5, 'door', { style: 'bifold', width: 0.85, side: -1 });
   open('hallN', 700 - 581, 'door', { style: 'bifold', width: 0.84 }); open('clo1N', 515 - 433.5, 'door', { style: 'bifold', width: 1.9, side: -1 });
-  open('clo2W', 802.5 - 710.5, 'door', { width: 0.81 }); open('east', 673 - 593.5, 'door', { side: -1, width: 0.91 }); open('balS', 251 - 8, 'door', { side: -1, hinge: 'right', width: 0.88 });
+  open('clo2W', 802.5 - 710.5, 'door', { width: 0.81 }); open('east', 673 - 593.5, 'door', { side: -1, width: 0.91 }); open('balS', 251 - 8, 'door', { side: -1, hinge: 'right', width: 0.88, style: 'glass', height: 2.5 }); // full-height glass door in the window wall
   // floor-to-ceiling glass, pane by pane between the mullions
   for (const [a, b] of [[166, 257], [257, 348], [348, 439], [439, 529], [531, 592], [620, 709], [709, 797], [797, 886]]) pane('west', a - 160.5, b - 160.5);
   const along = x => (x - 297.5) * Math.hypot(1, 0.0406); // distance along the angled window wall

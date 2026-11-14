@@ -55,7 +55,13 @@ function curtain(doc) {
   for (const o of doc.openings) if (o.type === 'window' && o.style === 'picture' && glass.has(o.wallId)) { o.style = 'curtain'; o.width = +(o.width + 4 * NEW_SCALE).toFixed(4); }
 }
 
-const FIXES = [['nook1', bedroomNook], ['layout2', retrace], ['details1', details], ['curtain1', curtain]];
+/** The balcony door sits in the floor-to-ceiling glass: make it a full-height glass door. */
+function balconyDoor(doc) {
+  const Q = (x, y) => ({ x: x * NEW_SCALE, y: y * NEW_SCALE }), w = doc.walls.find(w => near(w.a, Q(8, 160.5)) && near(w.b, Q(297.5, 160.5)));
+  if (w) for (const o of doc.openings) if (o.wallId === w.id && o.type === 'door' && o.style === 'single') { o.style = 'glass'; o.height = 2.5; }
+}
+
+const FIXES = [['nook1', bedroomNook], ['layout2', retrace], ['details1', details], ['curtain1', curtain], ['baldoor1', balconyDoor]];
 export function migrate(doc) {
   doc.fixes = doc.fixes || [];
   for (const [id, fn] of FIXES) if (!doc.fixes.includes(id)) { if (Array.isArray(doc.walls)) fn(doc); doc.fixes.push(id); }

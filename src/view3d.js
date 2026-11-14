@@ -199,7 +199,7 @@ function syncItems() {
 
 // ---- walls, openings, floors ----
 function buildOpening(o, x0, x1, top, t, group) {
-  const w = x1 - x0, cx = (x0 + x1) / 2, fr = mat('#f4f1ea'), ft = 0.05, fd = t + 0.03;
+  const w = x1 - x0, cx = (x0 + x1) / 2, fr = mat(o.style === 'glass' ? '#2b2d31' : '#f4f1ea'), ft = 0.05, fd = t + 0.03;
   if (o.style === 'opening') return;
   const y0 = o.sill, hgt = top - y0;
   if (o.style === 'curtain') { // window wall: thin dark mullions reaching over the pier to the next pane, so the glass reads as one run
@@ -219,6 +219,12 @@ function buildOpening(o, x0, x1, top, t, group) {
   if (o.style === 'sliding') {
     const gl = mat('#a9d4e6', 'glass');
     for (const s of [-1, 1]) group.add(box(iw / 2 + 0.03, ih, 0.012, cx + (s * iw) / 4, y0 + ih / 2, s * 0.02, gl, false), box(0.04, ih, 0.035, cx + s * 0.02, y0 + ih / 2, s * 0.02, mat('#2b2d31')));
+    return;
+  }
+  if (o.style === 'glass') { // full-glass swing door in a window wall: dark frame and the same glass as the panes
+    const dk = mat('#2b2d31'), m = 0.05, lx = x0 + ft;
+    group.add(box(iw, 0.06, 0.05, cx, y0 + 0.03, 0, dk), box(iw, m, 0.05, cx, y0 + ih - m / 2, 0, dk), box(m, ih, 0.05, lx + m / 2, y0 + ih / 2, 0, dk), box(m, ih, 0.05, x1 - ft - m / 2, y0 + ih / 2, 0, dk),
+      box(iw - 2 * m, ih - 0.06 - m, 0.012, cx, y0 + 0.06 + (ih - 0.06 - m) / 2, 0, mat('#a9d4e6', 'glass'), false), box(0.02, 0.3, 0.06, o.hinge === 'left' ? x1 - ft - 0.08 : lx + 0.08, y0 + 1.0, 0, mat('#b9bdc3', 'metal')));
     return;
   }
   const leaf = mat(S.doc.settings.doorColor || '#e8e2d6'), n = o.style === 'double' ? 2 : o.style === 'bifold' ? 4 : 1, lw = iw / n;
