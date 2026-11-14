@@ -22,7 +22,9 @@ export function buildSample(mine = false) {
   const open = (key, posPx, type, o = {}) => doc.openings.push({ id: uid('op'), wallId: W[key].id, pos: m(posPx), type, style: type === 'door' ? 'single' : 'picture',
     width: type === 'door' ? 0.84 : 1.5, height: type === 'door' ? 2.03 : 1.9, sill: type === 'door' ? 0 : 0.3, hinge: 'left', side: 1, ...o });
   // floor-to-ceiling glass between two mullions (pixel positions along the wall)
-  const pane = (key, from, to) => open(key, (from + to) / 2, 'window', { width: m(to - from - 6), height: 2.5, sill: 0.02, style: 'picture' });
+  // glass between two mullions (pixel positions along the wall). Facade windows sit on a 20" knee wall with a ledge (as in the photos);
+  // the glass facing the balcony runs floor to ceiling.
+  const pane = (key, from, to, low = false) => open(key, (from + to) / 2, 'window', { width: m(to - from - 6), height: low ? 2.5 : 1.98, sill: low ? 0.02 : 0.5, style: 'picture' });
 
   const gN = x => FACADE(x) + 8, rN = x => FACADE(x) + 3; // centre of the bedroom glass / of the balcony rail
   // balcony: a slight trapezoid under the angled facade
@@ -55,8 +57,8 @@ export function buildSample(mine = false) {
   for (const [a, b] of [[166, 257], [257, 348], [348, 439], [439, 529], [531, 592], [620, 709], [709, 797], [797, 886]]) pane('west', a - 160.5, b - 160.5);
   const along = x => (x - 297.5) * Math.hypot(1, 0.0406); // distance along the angled window wall
   for (const [a, b] of [[305, 348], [349, 444], [444, 541], [541, 631]]) pane('north', along(a), along(b));
-  for (const [a, b] of [[34, 73], [78, 150]]) pane('bedW', a - rN(297.5), b - rN(297.5));
-  for (const [a, b] of [[16, 115], [115, 213]]) pane('balS', a - 8, b - 8);
+  for (const [a, b] of [[34, 73], [78, 150]]) pane('bedW', a - rN(297.5), b - rN(297.5), true);
+  for (const [a, b] of [[16, 115], [115, 213]]) pane('balS', a - 8, b - 8, true);
 
   // rooms (a seed point inside each one carries its name and floor finish)
   const MINE = { Balcony: 'concrete', Bathroom: 'tile' }; // dark walnut vinyl plank everywhere else, as in the photos
@@ -70,6 +72,7 @@ export function buildSample(mine = false) {
   for (const [x, y] of [[58.5, 205], [428, 65.5], [59.5, 639]]) put('column', x, y, 0, { w: 0.69, d: 0.69, name: 'Structural column', locked: true });
   put('box', 113.5, 635, 0, { w: 0.64, d: 0.82, h: 2.6, name: 'Mechanical chase', color: '#cfccc6', locked: true });
   put('box', 428.5, 637, 0, { w: 0.7, d: 0.76, h: 2.6, name: 'Shaft', color: '#8f8c86', locked: true });
+  for (const it of roomDetails()) doc.items.push(it);
   if (mine) { furnishMine(put); doc.trace = { assetId: 'trace', x: 0, y: 0, scale: SCALE, opacity: 0.45, visible: false }; return doc; }
   // living
   put('rug', 205, 262, 90, { w: 2.74, d: 1.83 }); put('sofa3', 122, 262, 270); put('coffee', 212, 262, 90); put('tvstand', 289, 248, 90); put('tv', 302, 248, 90);
@@ -97,6 +100,19 @@ export function buildSample(mine = false) {
 
 // The real unit: kitchen as in the photos (wood-grain flat-panel cabinets, white quartz, linear glass mosaic, stainless appliances),
 // bath and laundry fixtures, and the chosen sofa & chaise. Everything else is left empty to furnish.
+/** Built-in details seen in the photos: the white knee wall and ledge under the facade windows, and the access panel on the
+ *  enclosure in the bedroom corner (the notch in the plan). Also used to bring saved plans up to date. */
+export function roomDetails() {
+  const it = (type, x, y, rot, extra) => makeItem(type, { x: m(x), y: m(y), rot, locked: true, ...extra });
+  const inner = x => FACADE(x) + 16, ang = Math.atan(-0.0406) * 180 / Math.PI; // inside face of the bedroom glass
+  return [
+    it('window_ledge', 467, inner(467) + 7, ang, { w: m(327) * Math.hypot(1, 0.0406), d: 0.178, name: 'Window ledge' }),        // bedroom 1, into the corner nook
+    it('window_ledge', 23, 379, 270, { w: m(425), d: 0.178, name: 'Window ledge' }),                                             // living room
+    it('window_ledge', 23, 742, 270, { w: m(279), d: 0.178, name: 'Window ledge' }),                                             // bedroom 2
+    it('access_panel', 586, 61.5, 90, { name: 'Access panel (enclosure)' }),
+  ];
+}
+
 function furnishMine(put) {
   const cab = { color: '#6e5646', color2: '#f1efea', grain: true, slab: true }, up = { ...cab, elev: 1.42, h: 0.98, d: 0.35 };
   put('basecab', 470, 357, 0, { ...cab, w: 0.78 }); put('range', 530, 359, 0, { name: 'Slide-in range (stainless)' }); put('basecab', 595, 357, 0, { ...cab, w: 0.9 });

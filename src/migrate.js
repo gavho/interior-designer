@@ -1,6 +1,6 @@
 // One-time fixes for plans saved before a correction to the apartment template, so saved work keeps its furniture.
 import { uid } from './util.js';
-import { buildSample, SCALE as NEW_SCALE } from './sample.js';
+import { buildSample, roomDetails, SCALE as NEW_SCALE } from './sample.js';
 
 const S = 0.0128, P = (x, y) => ({ x: +(x * S).toFixed(4), y: +(y * S).toFixed(4) });
 const near = (a, b) => Math.abs(a.x - b.x) < 0.02 && Math.abs(a.y - b.y) < 0.02;
@@ -40,7 +40,16 @@ function retrace(doc) {
   if (!doc.items.some(i => i.name === 'Shaft')) doc.items.push(fresh.items.find(i => i.name === 'Shaft'));
 }
 
-const FIXES = [['nook1', bedroomNook], ['layout2', retrace]];
+/** From the photos: facade windows sit on a 20" knee wall with a ledge, and the bedroom-corner enclosure has an access panel. */
+function details(doc) {
+  const Q = (x, y) => ({ x: x * NEW_SCALE, y: y * NEW_SCALE }), at = (a, b) => doc.walls.find(w => near(w.a, Q(...a)) && near(w.b, Q(...b)));
+  if (!at([581, 593.5], [792.5, 593.5])) return; // not the re-traced apartment
+  const facade = [at([8, 160.5], [8, 886.5]), at([297.5, 25 - 0.0406 * 283.5 + 8], [636, 25 - 0.0406 * 622 + 8])].filter(Boolean).map(w => w.id);
+  for (const o of doc.openings) if (o.type === 'window' && facade.includes(o.wallId) && (o.sill ?? 0) < 0.1) { o.sill = 0.5; o.height = 1.98; }
+  if (!doc.items.some(i => i.type === 'window_ledge')) doc.items.push(...roomDetails());
+}
+
+const FIXES = [['nook1', bedroomNook], ['layout2', retrace], ['details1', details]];
 export function migrate(doc) {
   doc.fixes = doc.fixes || [];
   for (const [id, fn] of FIXES) if (!doc.fixes.includes(id)) { if (Array.isArray(doc.walls)) fn(doc); doc.fixes.push(id); }

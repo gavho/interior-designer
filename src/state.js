@@ -24,7 +24,7 @@ export function newDoc() {
   return {
     app: 'interior-designer', version: 1, name: 'Untitled plan', units: 'imperial',
     settings: { wallHeight: 2.6, wallThickness: 0.15, wallColor: '#f3f0ea', snap: 0.0254 },
-    walls: [], openings: [], roomMeta: [], items: [], labels: [], dims: [], trace: null, fixes: ['nook1', 'layout2'],
+    walls: [], openings: [], roomMeta: [], items: [], labels: [], dims: [], trace: null, fixes: ['nook1', 'layout2', 'details1'],
   };
 }
 
