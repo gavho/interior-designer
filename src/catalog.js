@@ -157,6 +157,38 @@ const ladderShelf = (w, d, h) => {
   }
   return out;
 };
+// Futon: low frame on short legs, seat and split back cushions; `it.bed` lays it flat (the item depth becomes the sleeping depth).
+const futon = arms => (w, d, h, it = {}) => {
+  const lh = 0.09, arm = arms ? 0.15 : 0, iw = w - 2 * arm, out = [...legs(w, Math.min(d, 0.86), lh, 0.045, 'b').map(p => ({ ...p, z: p.z + (it.bed ? 0 : 0) }))];
+  if (arms) for (const s of [-1, 1]) out.push(rb(s * (w / 2 - arm / 2), lh, 0, arm, 0.48, d, 'a', 0.04));
+  if (it.bed) { out.push(bx(0, lh, 0, iw, 0.08, d - 0.02, 'a-'), rb(0, lh + 0.08, 0, iw - 0.01, 0.16, d - 0.03, 'a', 0.04)); for (const z of [-d / 6, d / 6]) out.push(bx(0, lh + 0.235, z, iw - 0.06, 0.01, 0.012, 'a-')); return out; }
+  const sd = Math.min(d - 0.22, 0.62), sh = 0.41;
+  out.push(bx(0, lh, 0, iw, 0.1, d - 0.04, 'a-'), rb(0, lh + 0.1, d / 2 - sd / 2 - 0.02, iw - 0.01, sh - lh - 0.1, sd, 'a', 0.04));
+  for (const s of [-1, 1]) out.push({ ...rb(s * (iw / 4), sh - 0.05, -d / 2 + 0.17, iw / 2 - 0.015, h - sh + 0.02, 0.16, 'a+', 0.04), rx: -0.18 });
+  return out;
+};
+// Sofa / console table: narrow top on a black metal frame with a bottom stretcher; `it.shelf` adds a lower shelf.
+const consoleTable = (w, d, h, it = {}) => {
+  const t = 0.03, f = 0.025, out = [bx(0, h - t, 0, w, t, d, 'a')];
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) out.push(bx(sx * (w / 2 - 0.04), 0, sz * (d / 2 - f / 2 - 0.005), f, h - t, f, 'b'));
+  for (const sx of [-1, 1]) out.push(bx(sx * (w / 2 - 0.04), 0.06, 0, f, f, d - 0.02, 'b'), bx(sx * (w / 2 - 0.04), h - t - f, 0, f, f, d - 0.02, 'b'));
+  out.push(bx(0, h - t - f, -d / 2 + f / 2 + 0.005, w - 0.1, f, f, 'b'), bx(0, h - t - f, d / 2 - f / 2 - 0.005, w - 0.1, f, f, 'b'));
+  if (it.shelf) out.push(bx(0, 0.1, 0, w - 0.1, 0.022, d - 0.03, 'a')); else out.push(bx(0, 0.06, 0, w - 0.1, f, f, 'b'));
+  return out;
+};
+// Powered PA speaker: trapezoid cabinet, black grille with woofer and horn, top handle, pole socket underneath.
+const paSpeaker = (w, d, h) => [bx(0, 0, d * 0.12, w, h, d * 0.76, 'a'), bx(0, h * 0.04, -d * 0.3, w * 0.72, h * 0.92, d * 0.4, 'a'), bx(0, h * 0.03, d / 2 - 0.006, w - 0.02, h * 0.94, 0.012, 'b'),
+  disc(0, h * 0.06, d / 2 + 0.002, w * 0.8, 0.006, 'black'), disc(0, h * 0.17, d / 2 + 0.004, w * 0.3, 0.006, 'b'), bx(0, h * 0.7, d / 2 + 0.002, w * 0.62, h * 0.2, 0.01, 'black'),
+  bx(0, h * 0.93, d / 2 + 0.006, w * 0.2, 0.025, 0.004, 'metal'), bx(0, h - 0.005, 0, w * 0.4, 0.03, 0.05, 'black'), cy(0, -0.001, 0, 0.05, 0.002, 'black')];
+// Tripod speaker stand: three splayed legs, telescoping pole, top adapter. The top (item height) is where a speaker rests.
+const tripod = (w, d, h) => {
+  const hy = Math.min(0.75, h * 0.42), r = Math.min(w, d) / 2 - 0.02, out = [cy(0, hy - 0.08, 0, 0.06, 0.12, 'a'), cy(0, hy, 0, 0.038, h - hy - 0.05, 'a'), cy(0, h - 0.05, 0, 0.035, 0.05, 'metal')];
+  for (let i = 0; i < 3; i++) { const a = (i * 2 * Math.PI) / 3 + Math.PI / 2, x = Math.cos(a) * r, z = Math.sin(a) * r, len = Math.hypot(r, hy);
+    out.push(stalk(x, 0, z, 0.028, len, 'a', -Math.atan2(-x, hy), Math.atan2(-z, hy)), stalk(x * 0.45, hy * 0.55, z * 0.45, 0.015, Math.hypot(r * 0.45, hy * 0.4), 'a', -Math.atan2(-x * 0.45, hy * 0.4), Math.atan2(-z * 0.45, hy * 0.4))); }
+  return out;
+};
+const vase = (w, d, h) => [{ ...cy(0, 0, 0, w, h * 0.72, 'a', { t: 0.72 }), d }, { ...cy(0, h * 0.72, 0, w * 0.72, h * 0.18, 'a', { t: 0.62 }), d: d * 0.72 }, { ...cy(0, h * 0.9, 0, w * 0.45, h * 0.1, 'a+', { t: 1.15 }), d: d * 0.45 }];
+const tray = (w, d, h) => [bx(0, 0, 0, w, 0.008, d, 'a'), bx(0, 0, -d / 2 + 0.005, w, h, 0.01, 'a'), bx(0, 0, d / 2 - 0.005, w, h * 0.55, 0.01, 'a'), bx(-w / 2 + 0.005, 0, 0, 0.01, h, d, 'a'), bx(w / 2 - 0.005, 0, 0, 0.01, h, d, 'a')];
 const table = (w, d, h) => [bx(0, h - 0.04, 0, w, 0.04, d, 'a'), ...legs(w, d, h - 0.04, Math.min(0.06, w * 0.08), 'a-')];
 const roundTable = (w, d, h) => [{ ...cy(0, h - 0.04, 0, w, 0.04, 'a'), d }, cy(0, 0.03, 0, Math.min(0.12, w * 0.15), h - 0.07, 'a-'), { ...cy(0, 0, 0, w * 0.5, 0.03, 'a-'), d: d * 0.5 }];
 const chair = (w, d, h) => { const s = Math.min(0.45, h * 0.5); return [...legs(w, d, s, 0.035, 'b'), bx(0, s, 0, w, 0.06, d, 'a'), bx(0, s + 0.06, -d / 2 + 0.025, w, h - s - 0.06, 0.05, 'a')]; };
@@ -269,6 +301,72 @@ const DEFS = [
     url: 'https://www.overstock.com/Home-Garden/Sansevieria-Snake-Plant-in-Black-Pot/35179990/product.html', colors: [['Green / black pot', '#4f7a4a']], note: '34" H × 12" W × 12" D with black pot.' },
   { id: 'oi_olive', like: 'plant', name: 'Faux olive topiary 5 ft in black pot', cat: 'Office ideas', w: 15 * IN, d: 15 * IN, h: 60 * IN, color: '#7d8a5a', color2: '#1d1d1f',
     url: 'https://www.christmascentral.com/5-olive-topiary-artificial-potted-tree/', colors: [['Olive / black pot', '#7d8a5a']], note: '5 ft H × 15" W × 15" D in a black pot.' },
+  // ---------- Snake plants in several sizes (pick a pot style under Pot) ----------
+  { id: 'sp_mini', like: 'plant_snake', name: 'Threshold mini tabletop snake plant 4.5"', cat: 'Plants', w: 4.5 * IN, d: 5 * IN, h: 4.5 * IN, color: '#4f7a4a', color2: '#f2f0eb', on: 1,
+    url: 'https://www.target.com/p/4-5-34-mini-tabletop-snake-artificial-plant-threshold-8482/-/A-87993605', note: '4.5" H × 4.5" W × 5" D in a small ceramic pot: desk or shelf size.' },
+  { id: 'sp_12', like: 'plant_snake', name: 'Flora Bunda snake plant 12.5" (white dimple pot on wood stand)', cat: 'Plants', w: 5.5 * IN, d: 5.5 * IN, h: 12.5 * IN, color: '#4f7a4a', color2: '#f2f0eb', on: 1,
+    url: 'https://www.homedepot.com/p/Flora-Bunda-12-5-in-Artificial-Faux-Snake-Plant-in-White-Dimple-Pattern-Ceramic-Pot-on-Wood-Stand-CS3819E-MTWH/313454507', note: '12.5" tall; pot about 5.5" across.' },
+  { id: 'sp_17', like: 'plant_snake', name: 'Crate & Barrel faux snake plant in pot 17.5"', cat: 'Plants', w: 10.5 * IN, d: 10.5 * IN, h: 17.5 * IN, color: '#4f7a4a', color2: '#e9e4da', on: 1,
+    url: 'https://www.crateandbarrel.com/faux-snake-plant-in-pot/s441771', note: '17.5" H × 10.5" diameter.' },
+  { id: 'sp_18', like: 'plant_snake', name: 'Primrue tabletop snake plant 18"', cat: 'Plants', w: 8 * IN, d: 6 * IN, h: 18 * IN, color: '#4f7a4a', color2: '#1d1d1f', on: 1,
+    url: 'https://www.wayfair.com/home/pdp/primrue-artificial-snake-plant-w004087203.html', note: '8" × 6" × 18" H. The same listing has a 26" size (below).' },
+  { id: 'sp_26', like: 'plant_snake', name: 'Primrue snake plant 26"', cat: 'Plants', w: 9 * IN, d: 9 * IN, h: 26 * IN, color: '#4f7a4a', color2: '#1d1d1f',
+    url: 'https://www.wayfair.com/home/pdp/primrue-artificial-snake-plant-w004087203.html', note: '9" × 9" × 26" H.' },
+  { id: 'sp_48', like: 'plant_snake', name: 'Snake plant 4 ft in black pot', cat: 'Plants', w: 15 * IN, d: 15 * IN, h: 48 * IN, color: '#5d7f45', color2: '#1d1d1f',
+    url: 'https://www.overstock.com/Home-Garden/4ft-Green-Yellow-Artificial-Sansevieria-Snake-Plant-in-Black-Pot-48-H-x-15-W-x-15-DP/42094342/product.html', note: '48" H × 15" W × 15" D, green and yellow leaves.' },
+  { id: 'sp_54', like: 'plant_snake', name: 'Nearly Natural 4.5 ft snake plant in gray planter', cat: 'Plants', w: 12 * IN, d: 12 * IN, h: 54 * IN, color: '#4f7a4a', color2: '#9a9a96',
+    url: 'https://www.target.com/p/nearly-natural-4-5-ft-sansevieria-artificial-plant-in-gray-planter/-/A-90178797', note: '54" H × 12" W × 12" D; the gray planter is 24" tall. Listed as out of stock when found.' },
+  { id: 'sp_55', like: 'plant_snake', name: 'Vintage Home 4.6 ft snake plant in fiberstone planter', cat: 'Plants', w: 20 * IN, d: 20 * IN, h: 55 * IN, color: '#4f7a4a', color2: '#8f8b84',
+    url: 'https://www.walmart.com/ip/Vintage-Home-Artificial-Faux-Real-Touch-4-58-Feet-Tall-Snake-Plant-Sansevieria-With-Fiberstone-Planter/794242708', note: '20" × 20" × 55" H, real-touch leaves, fiberstone planter.' },
+  // ---------- Office chairs ----------
+  { id: 'ch_branch', like: 'taskchair', name: 'Branch Ergonomic Chair', cat: 'Seating', w: 26 * IN, d: 24 * IN, h: 45 * IN, color: '#1e1f22', color2: '#1b1c1f',
+    url: 'https://www.bestbuy.com/product/branch-furniture-branch-ergonomic-chair-adjustable-office-chair-for-all-day-comfort-with-lumbar-support-and-recycled-mesh-back-black/J3GW7G3LP3',
+    colors: [['Black', '#1e1f22'], ['Baltic', '#3d5566'], ['Pebble White', '#e7e4dd'], ['Sand White', '#e2d9c8']], note: '26" W × 24" D × 45" H at full height (Branch assembly guide); adjustable lumbar, mesh back.' },
+  { id: 'ch_branch_lite', like: 'taskchair', name: 'Branch Ergonomic Chair Lite', cat: 'Seating', w: 27.4 * IN, d: 24.7 * IN, h: 42.5 * IN, color: '#1e1f22', color2: '#1b1c1f',
+    url: 'https://www.target.com/p/branch-ergonomic-chair-lite/-/A-1014919480', colors: [['Black', '#1e1f22']], note: '27.4" W × 24.7–26.7" D × 39.6–42.5" H; seat 19.3" W.' },
+  { id: 'ch_series1', like: 'taskchair', name: 'Steelcase Series 1', cat: 'Seating', w: 27 * IN, d: 23.75 * IN, h: 41.25 * IN, color: '#2b2d31', color2: '#1b1c1f',
+    url: 'https://www.steelcase.com/asia-en/products/office-chairs/steelcase-series-1', colors: [['Licorice', '#2b2d31']], note: '23.5–27" W × 21–23.75" D × 36.5–41.25" H (Steelcase spec sheet); shown at the largest settings.' },
+  { id: 'ch_hon', like: 'taskchair', name: 'HON Ignition 2.0 mid-back big & tall', cat: 'Seating', w: 30 * IN, d: 30 * IN, h: 46 * IN, color: '#1e1f22', color2: '#1b1c1f',
+    url: 'https://www.officedepot.com/a/products/8315527503/HON-Ignition-2-0-Mid-Back', colors: [['Black', '#1e1f22']], note: 'About 30" × 30" × 46" H; seat 17–21.5" high.' },
+  // ---------- Futons ----------
+  { id: 'fu_emily', name: 'DHP Emily futon (armless, 71")', cat: 'Seating', w: 71 * IN, d: 34 * IN, h: 32 * IN, bedD: 43 * IN, color: '#1f1f21', color2: '#2b2d31', mat: 'fabric', build: futon(false),
+    url: 'https://www.target.com/p/dhp-emily-convertible-futon/-/A-1002839209', colors: [['Black faux leather', '#1f1f21'], ['Grey linen', '#8e8c88'], ['Navy blue', '#2c3a55'], ['White faux leather', '#f0eeea']],
+    note: '71" W × 34" D × 32" H; seat 16" high. Opens to a 71" × 43" bed (tick "Opened as a bed").' },
+  { id: 'fu_brittany', name: 'Novogratz Brittany futon (81.5")', cat: 'Seating', w: 81.5 * IN, d: 34.5 * IN, h: 31.5 * IN, bedD: 43.5 * IN, color: '#5b5c5e', color2: '#7a5a3e', mat: 'fabric', build: futon(true),
+    url: 'https://www.target.com/p/novogratz-brittany-futon/-/A-1002453010', colors: [['Dark gray linen', '#5b5c5e'], ['Gray linen', '#9a9894'], ['Navy', '#2c3a55'], ['Green linen', '#5f6e57'], ['Mustard', '#c99a3a'], ['Black faux leather', '#1f1f21']],
+    note: '81.5" W × 34.5" D × 31.5" H with wooden legs; seat 16" high. Opens to a 70.5" × 43.5" bed (tick "Opened as a bed").' },
+  // ---------- Sofa / console tables (behind a couch) ----------
+  { id: 'ct_overstock', name: 'Modern 55" console table, wood top / black metal', cat: 'Tables', w: 55 * IN, d: 12 * IN, h: 36 * IN, color: '#7a5236', color2: '#1b1b1d', mat: 'wood', build: consoleTable, shelfOpt: 1,
+    url: 'https://www.overstock.com/Home-Garden/55-Modern-Solid-Wood-Metal-Black-Console-Table-55-L-x-12-W-x-36-H/43641094/product.html', colors: [['Wood / black', '#7a5236']],
+    note: '55" L × 12" W × 36" H: tall enough to sit behind most sofas. Solid wood top (colour not stated in the listing).' },
+  { id: 'ct_hendry', name: 'Hendry 54" narrow console, espresso / black iron', cat: 'Tables', w: 54 * IN, d: 10 * IN, h: 30 * IN, color: '#3b2a20', color2: '#1b1b1d', mat: 'wood', build: consoleTable, shelfOpt: 1,
+    url: 'https://www.lampsplus.com/p/159X7', colors: [['Espresso / matte black', '#3b2a20']], note: '54" W × 10" D × 30" H; only 10" deep, so it fits tight spots.' },
+  { id: 'ct_folke', name: 'Folke 55" American walnut console table', cat: 'Tables', w: 55 * IN, d: 17.5 * IN, h: 30 * IN, color: '#6b4a35', color2: '#1b1b1d', mat: 'wood', build: consoleTable, shelfOpt: 1,
+    url: 'https://www.lampsplus.com/c/0523F', colors: [['Walnut / black', '#6b4a35']], note: '55" W × 17.5" D × 30" H, walnut veneer with a black metal crossbar.' },
+  // ---------- 10" PA speakers and stands ----------
+  { id: 'pa_eon710', name: 'JBL EON710 10" powered PA speaker', cat: 'Audio', w: 13.07 * IN, d: 11.81 * IN, h: 23.11 * IN, color: '#1b1b1d', color2: '#2c2d30', on: 1, reach: 2.1, build: paSpeaker,
+    url: 'https://jblpro.com/en-US/products/jbl-eon710', colors: [['Black', '#1b1b1d']], note: '23.11" H × 13.07" W × 11.81" D, 26.2 lb; Bluetooth. Drop it on a tripod stand and it sits on top.' },
+  { id: 'pa_thump210', name: 'Mackie Thump210 10" powered PA speaker', cat: 'Audio', w: 13.0 * IN, d: 12.8 * IN, h: 22.4 * IN, color: '#1b1b1d', color2: '#2c2d30', on: 1, reach: 2.1, build: paSpeaker,
+    url: 'https://www.adorama.com/mathump210.html', colors: [['Black', '#1b1b1d']], note: '22.4" H × 13" W × 12.8" D, 25.4 lb.' },
+  { id: 'pa_ts410', name: 'Alto TS410 10" powered PA speaker', cat: 'Audio', w: 12.6 * IN, d: 12.5 * IN, h: 21.1 * IN, color: '#1b1b1d', color2: '#2c2d30', on: 1, reach: 2.1, build: paSpeaker,
+    url: 'https://www.altoprofessional.com/products/ts410', colors: [['Black', '#1b1b1d']], note: '21.1" H × 12.6" W × 12.5" D, 26 lb; Bluetooth, app control.' },
+  { id: 'pa_stand', name: 'Ultimate Support TS-80B tripod speaker stand', cat: 'Audio', w: 47 * IN, d: 47 * IN, h: 55 * IN, color: '#1b1b1d', build: tripod, surf: 1,
+    url: 'https://www.ultimatesupport.com/products/ts-80b', colors: [['Black', '#1b1b1d']], heightLabel: 'Stand height', heights: [['Lowest · 44"', 44 * IN], ['55"', 55 * IN], ['Highest · 79"', 79 * IN]],
+    note: 'Adjusts 44"–79"; the legs spread to a 47" circle. Holds up to 150 lb. Place a speaker on top; change the height and the speaker follows.' },
+  // ---------- More office decor ----------
+  { id: 'od_clock', like: 'clock', name: 'Nano wall clock, walnut / black', cat: 'Office ideas', w: 11 * IN, d: 3.5 * IN, h: 11.8 * IN, color: '#1d1d1f', color2: '#6b4a35',
+    url: 'https://www.2modern.com/products/nano-clock', colors: [['Walnut / black', '#1d1d1f']], note: '11" W × 3.5" D × 11.8" H.' },
+  { id: 'od_pegwall', like: 'pegboard', name: 'Amabro Peg Wall, walnut', cat: 'Office ideas', w: 23.6 * IN, d: 1.5 * IN, h: 35.4 * IN, color: '#6b4a35', color2: '#1d1d1f',
+    url: 'https://shop.gessato.com/amabro-peg-wall-walnut/', sizes: [['Medium 17.7" × 23.6"', 17.7 * IN, 1.5 * IN, 23.6 * IN], ['Large 23.6" × 35.4"', 23.6 * IN, 1.5 * IN, 35.4 * IN]],
+    note: 'Walnut peg board with pegs and accessories. Sizes are from the oak version of the listing.' },
+  { id: 'od_deskpad', like: 'deskmat', name: 'Smead vegan leather desk pad, charcoal', cat: 'Office ideas', w: 31.5 * IN, d: 15.7 * IN, h: 0.1 * IN, color: '#3a3b3e',
+    url: 'https://www.staples.com/smead-vegan-leather-desk-pad-31-5-x-15-7-charcoal-smd64833/product_SMD64833', colors: [['Charcoal', '#3a3b3e']], note: '31.5" × 15.7".' },
+  { id: 'od_tray', name: 'Carver walnut-finish letter tray', cat: 'Office ideas', w: 13.62 * IN, d: 10.62 * IN, h: 2.12 * IN, color: '#6b4a35', on: 1, mat: 'wood', build: tray,
+    url: 'https://www.ontimesupplies.com/cvrcw07212-walnut-finish-solid-wood-desk-trays-desktop-stackable-walnut-oak-1-each.html', colors: [['Walnut', '#6b4a35']], note: '13.62" × 10.62" × 2.12", stackable. Oak with a walnut finish.' },
+  { id: 'od_vase', name: 'Black ceramic vase with glossy rim 16.2"', cat: 'Office ideas', w: 9.8 * IN, d: 4.9 * IN, h: 16.2 * IN, color: '#1a1a1c', on: 1, build: vase,
+    url: 'https://www.athome.com/black-ceramic-vase-with-glossy-rim-16.2/125019795.html', colors: [['Black', '#1a1a1c']], note: '9.8" L × 4.9" W × 16.2" H.' },
+  { id: 'od_lamp', like: 'tablelamp', name: 'Henn&Hart matte black & brass table lamp', cat: 'Office ideas', w: 15 * IN, d: 15 * IN, h: 24.5 * IN, color: '#efe6d2', color2: '#1d1d1f',
+    url: 'https://www.cymax.com/Henn-Hart-15-Matte-Black-Brass-Ceramic-Metal-Fabric-Table-Lamp-242248X.htm', colors: [['Black / brass', '#efe6d2']], note: '15" W × 15" D × 24.5" H, ceramic and metal base with fabric shade.' },
   { id: 'shintenchi_island', name: 'Shintenchi rolling kitchen island with drop leaf', cat: 'My picks', w: 39.8 * IN, d: 24.8 * IN, h: 35.6 * IN, color: '#f4f3ef', color2: '#f4f3ef', clear: 0.9, build: islandCart,
     url: 'https://www.amazon.com/dp/B0GY8N9MWN',
     colors: [['White', '#f4f3ef'], ['Black', '#2a2a2b']],
@@ -394,8 +492,11 @@ const DEFS = [
 export const CATALOG = DEFS;
 export const CATEGORIES = [...new Set(DEFS.map(d => d.cat))];
 // `like: 'other_id'` reuses another piece's model and behaviour (mounting, resting on furniture, textures) with its own size, colours and link
+const POTS = [['Black', '#1d1d1f'], ['White ceramic', '#f2f0eb'], ['Stone grey', '#9a9a96'], ['Terracotta', '#b5643c'], ['Walnut', '#6b4a35'], ['Woven', '#c9b28c']];
 { const base = Object.fromEntries(DEFS.map(d => [d.id, d]));
-  DEFS.forEach((d, i) => { if (d.like && base[d.like]) { const { id, name, cat, url, colors, note, sizes, ...b } = base[d.like]; DEFS[i] = { ...b, ...d }; } }); }
+  DEFS.forEach((d, i) => { if (d.like && base[d.like]) { const { id, name, cat, url, colors, note, sizes, ...b } = base[d.like]; DEFS[i] = { ...b, ...d }; } });
+  const plantish = new Set(['plant', 'plant_small', 'plant_snake', 'plant_fiddle', 'pothos']);
+  DEFS.forEach(d => { if (plantish.has(d.id) || plantish.has(d.like)) d.pots ??= POTS; }); }
 const byId = Object.fromEntries(DEFS.map(d => [d.id, d]));
 export const getDef = type => byId[type] || byId.box;
 

@@ -26,7 +26,7 @@ export function addItem(item) { S.doc.items.push(item); select([{ k: 'item', id:
 export const sits = it => it.on ?? !!getDef(it.type).on;
 /** Height of whatever is under a small piece (desk, shelf, monitor stand), so it lands on that instead of the floor. */
 export function surfaceUnder(it) {
-  const cap = Math.max(1.3, (it.elev || 0) + 0.05); // reach a higher shelf by typing its "Off floor" height once
+  const cap = Math.max(getDef(it.type).reach || 1.3, (it.elev || 0) + 0.05); // reach a higher shelf by typing its "Off floor" height once
   let top = 0;
   for (const o of S.doc.items) {
     const def = getDef(o.type);
