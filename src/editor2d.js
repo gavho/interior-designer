@@ -21,6 +21,7 @@ const touches = new Map();
 let pressStart = { x: 0, y: 0 }, pinch = null, pinchDone = false, fat = 1, pressTimer = 0, lastTap = null, lastTouchAt = 0;
 const TOUCH_TOOLS = new Set(['wall', 'arc', 'door', 'window', 'place', 'measure', 'calibrate', 'outlet', 'cable']);
 let cableDraft = null; // cable tool: { kind, from, path }
+let rightPanned = false; // set on a right-button pan release so the following contextmenu is skipped
 
 const w2s = p => ({ x: (p.x - view.cx) * view.zoom + W / 2, y: (p.y - view.cy) * view.zoom + H / 2 });
 const s2w = p => ({ x: (p.x - W / 2) / view.zoom + view.cx, y: (p.y - H / 2) / view.zoom + view.cy });
@@ -453,7 +454,7 @@ function pinchMove() {
 
 function toolDown(e) {
   const p = s2w(mouse);
-  if (e.button === 1 || (e.button === 0 && (spaceDown || S.tool === 'pan'))) { drag = { t: 'pan', m: mouse, cx: view.cx, cy: view.cy }; cv.style.cursor = 'grabbing'; return; }
+  if (e.button === 1 || e.button === 2 || (e.button === 0 && (spaceDown || S.tool === 'pan'))) { drag = { t: 'pan', m: mouse, cx: view.cx, cy: view.cy }; cv.style.cursor = 'grabbing'; return; }
   if (e.button !== 0) return;
   const tool = S.tool;
 
@@ -755,7 +756,7 @@ function onUp2(e) {
   const d = drag; drag = null;
   if (!d) return;
   if (d.t === 'touchtool') { mouse = evPos(e); toolDown(e); return; }
-  if (d.t === 'pan') { cv.style.cursor = ''; if (d.tap && dist(evPos(e), d.m) < 8) { select(d.room ? [d.room] : []); requestDraw(); } return; }
+  if (d.t === 'pan') { cv.style.cursor = ''; if (e.button === 2) rightPanned = dist(evPos(e), d.m) >= 4; if (d.tap && dist(evPos(e), d.m) < 8) { select(d.room ? [d.room] : []); requestDraw(); } return; }
   if (d.t === 'marquee') {
     const b = d.b;
     if (!b || dist(w2s(d.a), w2s(b)) < 5) select(d.room ? [d.room] : []);
@@ -837,6 +838,7 @@ export function initEditor(canvas) {
   cv.addEventListener('contextmenu', e => {
     e.preventDefault();
     if (performance.now() - lastTouchAt < 800) return; // touch uses long-press instead
+    if (rightPanned) { rightPanned = false; return; } // a right-drag panned; only a still right-click opens the menu
     if (S.tool === 'wall' && draft) { draft = null; preview = null; typed = ''; requestDraw(); return; }
     if (S.tool !== 'select') { setTool('select'); return; }
     openContext(e.clientX, e.clientY);

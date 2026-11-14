@@ -102,6 +102,13 @@ export function schedule() {
 
 /** Snap a plan point to the nearest wall face for wall-mounted points: returns { x, y, rot, wallId } or null. */
 export function wallFace(p, reach = 0.6) {
+  // a window ledge (knee wall) stands in front of its wall: points over one go on its front face, like the built-in ledge outlets
+  for (const it of S.doc.items.filter(i => i.type === 'window_ledge')) {
+    const l = rot(sub(p, it), -it.rot);
+    if (Math.abs(l.x) > it.w / 2 + 0.05 || Math.abs(l.y) > it.d / 2 + 0.15) continue;
+    const f = add(it, rot({ x: clamp(l.x, -it.w / 2 + 0.05, it.w / 2 - 0.05), y: it.d / 2 + 0.004 }, it.rot));
+    return { x: f.x, y: f.y, rot: it.rot, dd: 0 };
+  }
   let best = null;
   for (const w of S.doc.walls) {
     const g = S.wallGeom.get(w.id); if (!g || g.len < 0.2) continue;
