@@ -202,6 +202,13 @@ function buildOpening(o, x0, x1, top, t, group) {
   const w = x1 - x0, cx = (x0 + x1) / 2, fr = mat('#f4f1ea'), ft = 0.05, fd = t + 0.03;
   if (o.style === 'opening') return;
   const y0 = o.sill, hgt = top - y0;
+  if (o.style === 'curtain') { // window wall: thin dark mullions reaching over the pier to the next pane, so the glass reads as one run
+    const dk = mat('#2b2d31'), m = 0.035, ex = 0.02;
+    group.add(box(m, hgt, fd, x0 + m / 2 - ex, y0 + hgt / 2, 0, dk), box(m, hgt, fd, x1 - m / 2 + ex, y0 + hgt / 2, 0, dk),
+      box(w + 2 * ex, m, fd, cx, top - m / 2, 0, dk), box(w + 2 * ex, m, fd + 0.02, cx, y0 + m / 2, 0, dk),
+      box(w - 2 * m + 2 * ex, hgt - 2 * m, 0.012, cx, y0 + hgt / 2, 0, mat('#a9d4e6', 'glass'), false));
+    return;
+  }
   group.add(box(ft, hgt, fd, x0 + ft / 2, y0 + hgt / 2, 0, fr), box(ft, hgt, fd, x1 - ft / 2, y0 + hgt / 2, 0, fr), box(w, ft, fd, cx, top - ft / 2, 0, fr));
   if (o.type === 'window') {
     group.add(box(w, ft, fd + 0.04, cx, y0 + ft / 2, 0, fr), box(w - 2 * ft, hgt - 2 * ft, 0.012, cx, y0 + hgt / 2, 0, mat('#a9d4e6', 'glass'), false));

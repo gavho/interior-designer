@@ -231,7 +231,7 @@ function drawOpening(o, ghost) {
   ctx.fillRect(-hw, -t / 2 - px(1), o.width, t + px(2));
   ctx.strokeRect(-hw, -t / 2, o.width, t);
   ctx.beginPath();
-  if (o.type === 'window') { ctx.moveTo(-hw, 0); ctx.lineTo(hw, 0); if (o.style !== 'picture') { ctx.moveTo(0, -t / 2); ctx.lineTo(0, t / 2); } }
+  if (o.type === 'window') { ctx.moveTo(-hw, 0); ctx.lineTo(hw, 0); if (o.style !== 'picture' && o.style !== 'curtain') { ctx.moveTo(0, -t / 2); ctx.lineTo(0, t / 2); } }
   else if (o.style === 'single' || o.style === 'double') {
     const leaf = (hx, dirx, r) => { ctx.moveTo(hx, 0); ctx.lineTo(hx, s * r); const a0 = (s * Math.PI) / 2, a1 = dirx > 0 ? 0 : Math.PI; ctx.moveTo(hx, s * r); ctx.arc(hx, 0, r, a0, a1, (s > 0) === (dirx > 0)); };
     if (o.style === 'single') leaf(o.hinge === 'left' ? -hw : hw, o.hinge === 'left' ? 1 : -1, o.width);

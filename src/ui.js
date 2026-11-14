@@ -305,7 +305,7 @@ function buildTab() {
       row('Wall height', lenInput(s.wallHeight, edit(v => { s.wallHeight = Math.max(0.5, v); S.doc.walls.forEach(w => (w.height = s.wallHeight)); }), false)),
       row('Snap increment', selectInput(units() === 'imperial' ? [['0.0127', '½ inch'], ['0.0254', '1 inch'], ['0.0762', '3 inches'], ['0.1524', '6 inches'], ['0.3048', '1 foot']] : [['0.01', '1 cm'], ['0.05', '5 cm'], ['0.1', '10 cm'], ['0.5', '50 cm']], String(s.snap), edit(v => (s.snap = +v))))),
     section('Doors', h('div.stack', null, door('Single door', { style: 'single', width: 0.81 }), door('Double door', { style: 'double', width: 1.52 }), door('Sliding glass', { style: 'sliding', width: 1.83 }), door('Bifold closet', { style: 'bifold', width: 1.22 }), door('Cased opening', { style: 'opening', width: 1.0, height: 2.1 }))),
-    section('Windows', h('div.stack', null, win('Standard', { style: 'standard', width: 1.2, height: 1.2, sill: 0.9 }), win('Picture', { style: 'picture', width: 1.8, height: 1.4, sill: 0.75 }), win('Floor-to-ceiling', { style: 'picture', width: 1.5, height: 2.2, sill: 0.08 }), win('High / small', { style: 'standard', width: 0.7, height: 0.5, sill: 1.5 }))),
+    section('Windows', h('div.stack', null, win('Standard', { style: 'standard', width: 1.2, height: 1.2, sill: 0.9 }), win('Picture', { style: 'picture', width: 1.8, height: 1.4, sill: 0.75 }), win('Floor-to-ceiling', { style: 'picture', width: 1.5, height: 2.2, sill: 0.08 }), win('High / small', { style: 'standard', width: 0.7, height: 0.5, sill: 1.5 }), win('Window wall pane', { style: 'curtain', width: 1.15, height: 1.98, sill: 0.5 }))),
     section('Trace a floor plan image',
       t ? [row('Visible', check('', t.visible, edit(v => (t.visible = v)))),
         row('Opacity', h('input', { type: 'range', min: 0.05, max: 1, step: 0.05, value: t.opacity, oninput: e => { t.opacity = +e.target.value; touch(); }, onchange: () => commit() })),
@@ -513,7 +513,7 @@ function openingProps(o) {
   const door = o.type === 'door', w = find('wall', o.wallId), g = S.wallGeom.get(w.id);
   return [
     h('h2', null, door ? 'Door' : 'Window'),
-    section(null, row('Style', selectInput(door ? [['single', 'Single swing'], ['double', 'Double swing'], ['sliding', 'Sliding glass'], ['bifold', 'Bifold'], ['opening', 'Cased opening']] : [['standard', 'Standard (divided)'], ['picture', 'Picture (single pane)']], o.style, edit(v => (o.style = v)))),
+    section(null, row('Style', selectInput(door ? [['single', 'Single swing'], ['double', 'Double swing'], ['sliding', 'Sliding glass'], ['bifold', 'Bifold'], ['opening', 'Cased opening']] : [['standard', 'Standard (divided)'], ['picture', 'Picture (single pane)'], ['curtain', 'Window wall (dark mullions)']], o.style, edit(v => (o.style = v)))),
       row('Width', lenInput(o.width, edit(v => (o.width = Math.min(Math.max(0.2, v), g.len - 0.1))))), row('Height', lenInput(o.height, edit(v => (o.height = Math.max(0.2, v))))),
       !door && row('Sill height', lenInput(o.sill, edit(v => (o.sill = Math.max(0, v))))),
       row('From wall start', lenInput(o.pos - o.width / 2, edit(v => (o.pos = v + o.width / 2)), false))),

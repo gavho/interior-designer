@@ -49,7 +49,13 @@ function details(doc) {
   if (!doc.items.some(i => i.type === 'window_ledge')) doc.items.push(...roomDetails());
 }
 
-const FIXES = [['nook1', bedroomNook], ['layout2', retrace], ['details1', details]];
+/** Glass walls drawn as one curtain wall (dark mullions, panes edge to edge) instead of separate framed windows. */
+function curtain(doc) {
+  const glass = new Set(doc.walls.filter(w => w.thickness >= 0.19).map(w => w.id));
+  for (const o of doc.openings) if (o.type === 'window' && o.style === 'picture' && glass.has(o.wallId)) { o.style = 'curtain'; o.width = +(o.width + 4 * NEW_SCALE).toFixed(4); }
+}
+
+const FIXES = [['nook1', bedroomNook], ['layout2', retrace], ['details1', details], ['curtain1', curtain]];
 export function migrate(doc) {
   doc.fixes = doc.fixes || [];
   for (const [id, fn] of FIXES) if (!doc.fixes.includes(id)) { if (Array.isArray(doc.walls)) fn(doc); doc.fixes.push(id); }

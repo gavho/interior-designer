@@ -24,7 +24,7 @@ export function buildSample(mine = false) {
   // floor-to-ceiling glass between two mullions (pixel positions along the wall)
   // glass between two mullions (pixel positions along the wall). Facade windows sit on a 20" knee wall with a ledge (as in the photos);
   // the glass facing the balcony runs floor to ceiling.
-  const pane = (key, from, to, low = false) => open(key, (from + to) / 2, 'window', { width: m(to - from - 6), height: low ? 2.5 : 1.98, sill: low ? 0.02 : 0.5, style: 'picture' });
+  const pane = (key, from, to, low = false) => open(key, (from + to) / 2, 'window', { width: m(to - from - 2), height: low ? 2.5 : 1.98, sill: low ? 0.02 : 0.5, style: 'curtain' });
 
   const gN = x => FACADE(x) + 8, rN = x => FACADE(x) + 3; // centre of the bedroom glass / of the balcony rail
   // balcony: a slight trapezoid under the angled facade

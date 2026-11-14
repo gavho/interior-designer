@@ -474,7 +474,10 @@ const DEFS = [
   { id: 'column', name: 'Round column', cat: 'Structure', w: 0.7, d: 0.7, h: 2.6, color: '#bdbab4', build: (w, d, h) => [{ ...cy(0, 0, 0, w, h, 'a'), d }] },
   { id: 'column_sq', name: 'Square column', cat: 'Structure', w: 0.5, d: 0.5, h: 2.6, color: '#bdbab4', build: (w, d, h) => [bx(0, 0, 0, w, h, d, 'a')] },
   { id: 'stairs', name: 'Staircase', cat: 'Structure', w: 1.0, d: 3.0, h: 2.6, color: '#b89468', mat: 'wood', build: (w, d, h) => { const n = Math.max(2, Math.round(h / 0.18)); return Array.from({ length: n }, (_, i) => bx(0, 0, d / 2 - (d / n) * (i + 0.5), w, (h / n) * (i + 1), d / n, i % 2 ? 'a' : 'a+')); } },
-  { id: 'window_ledge', name: 'Window ledge (knee wall)', cat: 'Structure', w: 2.4, d: 0.2, h: 0.5, color: '#f4f3ef', build: (w, d, h) => [bx(0, 0, -0.005, w, 0.1, d - 0.03, '#eceae5'), bx(0, 0.1, -0.01, w, h - 0.13, d - 0.04, 'a'), bx(0, h - 0.03, 0, w, 0.03, d, 'a+')] },
+  { id: 'window_ledge', name: 'Window ledge (knee wall)', cat: 'Structure', w: 2.4, d: 0.2, h: 0.5, color: '#f4f3ef', build: (w, d, h) => { const out = [bx(0, 0, -0.005, w, 0.1, d - 0.03, '#eceae5'), bx(0, 0.1, -0.01, w, h - 0.13, d - 0.04, 'a'), bx(0, h - 0.03, 0, w, 0.03, d, 'a+')];
+    const n = Math.max(1, Math.round(w / 1.8)); // duplex outlets along the face, as in the photos
+    for (let i = 0; i < n; i++) { const x = -w / 2 + (w / n) * (i + 0.5); out.push(bx(x, 0.24, d / 2 - 0.019, 0.07, 0.115, 0.006, '#fbfaf7'), bx(x, 0.27, d / 2 - 0.015, 0.03, 0.022, 0.003, 'dark'), bx(x, 0.31, d / 2 - 0.015, 0.03, 0.022, 0.003, 'dark')); }
+    return out; } },
   { id: 'access_panel', name: 'Access panel', cat: 'Structure', w: 0.45, d: 0.02, h: 1.55, elev: 0.18, color: '#f4f3ef', mount: 'wall',
     build: (w, d, h) => [bx(0, 0, 0, w, h, d * 0.5, 'a-'), bx(0, 0.015, d * 0.25, w - 0.03, h - 0.03, d * 0.5, 'a'), disc(0, h * 0.62, d * 0.5 + 0.004, 0.04, 0.008, 'metal')] },
   { id: 'counter', name: 'Counter / half wall', cat: 'Structure', w: 1.8, d: 0.3, h: 1.05, color: '#f3f0ea', color2: '#6f5440', build: (w, d, h) => [bx(0, 0, 0, w, h - 0.04, d, 'a'), bx(0, h - 0.04, 0, w + 0.04, 0.04, d + 0.1, 'b')] },
