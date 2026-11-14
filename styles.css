@@ -23,7 +23,7 @@ kbd { font: 11px ui-monospace, Consolas, monospace; background: #eef0f3; border:
 .hint { color: var(--muted); font-size: 12px; margin: 6px 0; }
 
 #app { display: grid; height: 100%; position: relative;
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); grid-template: 46px minmax(0, 1fr) 26px / 48px 296px minmax(0, 1fr) 284px;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); --rail: 48px; --lw: 296px; --rw: 284px; grid-template: 46px minmax(0, 1fr) 26px / var(--rail) var(--lw) minmax(0, 1fr) var(--rw);
   grid-template-areas: "top top top top" "rail left stage right" "status status status status"; }
 
 /* ---- top bar ---- */
@@ -174,7 +174,7 @@ kbd { font: 11px ui-monospace, Consolas, monospace; background: #eef0f3; border:
   #printimg { display: block; max-width: 100%; max-height: 96vh; margin: 0 auto; }
 }
 @media (max-width: 1100px) {
-  #app { grid-template-columns: 48px 250px minmax(0, 1fr) 240px; }
+  #app { --lw: 250px; --rw: 240px; }
 }
 .optmenu { display: none; }
 @media (max-width: 1366px) { #topbar .toggle { display: none; } #topbar .optmenu { display: inline-block; } }
@@ -224,7 +224,8 @@ kbd { font: 11px ui-monospace, Consolas, monospace; background: #eef0f3; border:
 
 /* iPad landscape: the properties panel slides out so the plan keeps its room */
 @media (pointer: coarse) and (max-width: 1366px) {
-  #app { grid-template-columns: 52px 290px minmax(0, 1fr) 0; }
+  #app { --rail: 52px; --lw: 290px; --rw: 0px; }
+  #app.rightclosed #right { display: block; }
   #topbar .drawer-btn.dr { display: inline-block; }
   .brandname, .saved { display: none; }
   #right { position: absolute; z-index: 20; top: 0; bottom: 0; width: min(330px, 80vw);
@@ -233,7 +234,8 @@ kbd { font: 11px ui-monospace, Consolas, monospace; background: #eef0f3; border:
 }
 /* iPad portrait and other narrow screens: both side panels slide over the plan */
 @media (max-width: 1000px) {
-  #app { grid-template-columns: 52px 0 minmax(0, 1fr) 0; }
+  #app { --rail: 52px; --lw: 0px; --rw: 0px; }
+  #app.leftclosed #left { display: flex; }
   #topbar .drawer-btn { display: inline-block; }
   .brandname, .saved, #topbar .docname { display: none; }
   #left, #right { position: absolute; z-index: 20; top: 0; bottom: 0; width: min(330px, 80vw); /* placed within their (zero-width) grid areas */
@@ -254,3 +256,15 @@ kbd { font: 11px ui-monospace, Consolas, monospace; background: #eef0f3; border:
 .presets.retail button.named { width: auto; height: auto; display: flex; align-items: center; gap: 6px; padding: 4px 9px 4px 5px; border-color: var(--line); font-size: 12px; }
 .presets.retail i { width: 16px; height: 16px; border-radius: 4px; border: 1px solid rgba(0, 0, 0, .18); }
 .hint.note { background: #f6f3ea; border-radius: 6px; padding: 7px 9px; color: #5d564a; }
+
+/* ---- collapsible side panels: a tab on each panel's edge closes it; the same tab brings it back ---- */
+#app.leftclosed { --lw: 0px; }
+#app.leftclosed #left { display: none; }
+#app.rightclosed { --rw: 0px; }
+#app.rightclosed #right { display: none; }
+.panel-tab { position: fixed; z-index: 25; width: 22px; height: 52px; padding: 0; display: grid; place-items: center; font-size: 17px; line-height: 1; color: #4a5260;
+  background: #fff; border: 1px solid var(--line); box-shadow: 0 2px 8px rgba(20, 30, 50, .14); touch-action: manipulation; transition: left .2s ease, opacity .15s; }
+.panel-tab.l { border-radius: 0 9px 9px 0; border-left: 0; }
+.panel-tab.r { border-radius: 9px 0 0 9px; border-right: 0; }
+@media (pointer: coarse) { .panel-tab { width: 28px; height: 64px; font-size: 20px; } }
+@media print { .panel-tab { display: none; } }

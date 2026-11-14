@@ -28,7 +28,7 @@ The app is touch-ready and can be hosted for free on GitHub Pages:
 Touch gestures: tap to select (then drag to move), drag on empty floor to box-select, **pinch** to zoom,
 **two-finger drag** to pan, **long-press** for the actions menu, and **double-tap** to rename a room, split a wall
 or (in 3D) zoom to a piece. Drawing tools follow your finger and place on lift; tap **✓ Done** to finish.
-In portrait, **☰ Panel** and **Properties** slide the side panels in. Walk mode shows on-screen arrows.
+The small **‹ ›** tabs on the panel edges hide or show the side panels to give the plan the whole screen; in portrait, **☰ Panel** and **Properties** slide them in. Walk mode shows on-screen arrows.
 Saving on the iPad: work autosaves as you go. **File → Save to My projects** keeps named projects inside the app on
 this device (reopen them from **File → My projects…**). **Save a copy to Files** opens the share sheet so a `.json`
 backup can go to Files, iCloud Drive or AirDrop, and **Open from Files…** loads one back. Add the app to the Home Screen

@@ -184,7 +184,7 @@ function syncItems() {
   const seen = new Set();
   for (const it of S.doc.items) {
     seen.add(it.id);
-    const sig = [it.type, it.w, it.d, it.h, it.color, it.color2, it.flip, it.assetId, it.image, it.tex, it.grain, it.slab, it.chaiseW, it.seatH, it.armH, it.seatD].join('|');
+    const sig = [it.type, it.w, it.d, it.h, it.color, it.color2, it.flip, it.assetId, it.image, it.tex, it.grain, it.slab, it.chaiseW, it.seatH, it.armH, it.seatD, it.leafDown].join('|');
     let o = itemObjs.get(it.id);
     if (!o || o.sig !== sig) {
       if (o) itemsGroup.remove(o.group);

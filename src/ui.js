@@ -81,13 +81,13 @@ function buildTopbar() {
   const saved = h('span.saved', null, '');
   $('topbar').replaceChildren(
     h('div.brand', null, h('span.logo', null, '⌂'), h('span.brandname', null, 'Interior Designer')),
-    h('button.drawer-btn.dl', { title: 'Show the catalogue and tools panel', onclick: () => toggleDrawer('left') }, '☰ Panel'),
+    h('button.drawer-btn.dl', { title: 'Show the catalogue and tools panel', onclick: () => setPanel('left') }, '☰ Panel'),
     h('button.menu-btn', { onclick: e => fileMenu(e.currentTarget) }, 'File ▾'), name, saved,
     h('div.sep'), undoB, redoB, h('div.sep'),
     tog('snapGrid', 'Grid snap', 'Snap to the measurement grid (G)'), tog('snapAngle', 'Angle snap', 'Snap walls to 15° steps'), tog('magnet', 'Wall magnet', 'Furniture snaps flush to walls'),
     tog('showDims', 'Dimensions', 'Show wall lengths'), tog('showLabels', 'Labels', 'Show room names and areas'),
     h('button.menu-btn.optmenu', { onclick: e => { const r = e.currentTarget.getBoundingClientRect(); menu(r.left, r.bottom + 4, [...document.querySelectorAll('#topbar .toggle')].map(b => ({ label: (S.prefs[b.dataset.pref] ? '✓ ' : '\u2003 ') + b.textContent, run: () => setPref(b.dataset.pref, !S.prefs[b.dataset.pref]) }))); } }, 'Options ▾'),
-    h('div.grow'), h('button.drawer-btn.dr', { title: 'Show the properties panel', onclick: () => toggleDrawer('right') }, 'Properties'), unit, viewSeg, h('button.menu-btn', { onclick: helpDialog, title: 'Keyboard shortcuts (?)' }, '?'));
+    h('div.grow'), h('button.drawer-btn.dr', { title: 'Show the properties panel', onclick: () => setPanel('right') }, 'Properties'), unit, viewSeg, h('button.menu-btn', { onclick: helpDialog, title: 'Keyboard shortcuts (?)' }, '?'));
   const sync = () => {
     undoB.disabled = !canUndo(); redoB.disabled = !canRedo();
     document.querySelectorAll('#topbar .toggle').forEach(b => b.classList.toggle('on', !!S.prefs[b.dataset.pref]));
@@ -106,11 +106,42 @@ export function toggleDrawer(side, open) {
   const v = open ?? !app.classList.contains(key);
   app.classList.remove('drawerleft', 'drawerright');
   app.classList.toggle(key, v);
+  placeTabs();
+}
+// Side panels are either docked (they take room from the plan; closing collapses them) or drawers (they slide over the plan).
+const docked = side => !matchMedia('(max-width: 1000px)').matches && (side === 'left' || !matchMedia('(pointer: coarse) and (max-width: 1366px)').matches);
+const panelOpen = side => (docked(side) ? !$('app').classList.contains(side + 'closed') : $('app').classList.contains('drawer' + side));
+export function setPanel(side, open = !panelOpen(side)) {
+  if (docked(side)) { $('app').classList.toggle(side + 'closed', !open); placeTabs(); }
+  else toggleDrawer(side, open);
+  try { localStorage.setItem('id-closed', ['left', 'right'].filter(s => $('app').classList.contains(s + 'closed')).join(',')); } catch {}
+}
+const tabs = {};
+function placeTabs() {
+  if (!tabs.left) return;
+  const go = () => {
+    const st = $('stage').getBoundingClientRect(), top = st.top + st.height / 2 - tabs.left.offsetHeight / 2;
+    for (const side of ['left', 'right']) {
+      const t = tabs[side], open = panelOpen(side), p = $(side).getBoundingClientRect(), w = t.offsetWidth;
+      t.style.top = top + 'px';
+      t.style.left = (side === 'left' ? (open ? p.right : st.left) : (open ? p.left - w : st.right - w)) + 'px';
+      t.textContent = (side === 'left') === open ? '‹' : '›';
+      t.title = `${open ? 'Hide' : 'Show'} the ${side === 'left' ? 'catalogue and tools' : 'properties'} panel`;
+    }
+  };
+  requestAnimationFrame(go); setTimeout(go, 230); // again once a sliding drawer has settled
+}
+function buildPanelTabs() {
+  for (const side of ['left', 'right']) { tabs[side] = h('button.panel-tab.' + side[0], { onclick: () => setPanel(side) }); document.body.append(tabs[side]); }
+  try { for (const s of (localStorage.getItem('id-closed') || '').split(',')) if (s === 'left' || s === 'right') $('app').classList.add(s + 'closed'); } catch {}
+  addEventListener('resize', placeTabs); new ResizeObserver(placeTabs).observe($('stage'));
+  for (const side of ['left', 'right']) $(side).addEventListener('transitionend', e => e.target === $(side) && e.propertyName === 'transform' && placeTabs());
+  placeTabs();
 }
 const narrow = () => matchMedia('(max-width: 1000px)').matches;
 export const isTouch = matchMedia('(pointer: coarse)').matches;
 
-export function setView(v) { $('app').dataset.view = v; setPref('view', v); }
+export function setView(v) { $('app').dataset.view = v; setPref('view', v); placeTabs(); }
 
 function fileMenu(anchor) {
   const r = anchor.getBoundingClientRect();
@@ -195,7 +226,7 @@ function helpDialog() {
     ['Q / E', 'Rotate selection 90° (Shift: 15°)'], ['Arrows', 'Nudge (Shift: larger)'], ['Ctrl+D', 'Duplicate'], ['Ctrl+C / V', 'Copy / paste'], ['Del', 'Delete'], ['Ctrl+Z / Y', 'Undo / redo'], ['Ctrl+A', 'Select all furniture'],
     ['G', 'Toggle grid snap'], ['1 / 2 / 3', '2D / split / 3D view'], ['Esc', 'Cancel / deselect'], ['Double-click wall', 'Split wall'], ['Double-click in 3D', 'Zoom in on a piece'], ['Double-click room', 'Rename room'], ['Shift while drawing', 'Lock to 45° steps'], ['Alt while dragging', 'Ignore snapping']];
   const gestures = [['Tap', 'Select (tap again and drag to move)'], ['Drag on empty floor', 'Box-select'], ['Pinch', 'Zoom'], ['Two-finger drag', 'Pan the plan'], ['Long-press', 'Actions menu (split wall, add door, lock…)'],
-    ['Double-tap', 'Rename room / split wall / zoom to a piece in 3D'], ['Drawing tools', 'Touch, slide to aim, lift to place; tap ✓ Done to finish'], ['☰ Panel / Properties', 'Open the side panels on a narrow screen']];
+    ['Double-tap', 'Rename room / split wall / zoom to a piece in 3D'], ['Drawing tools', 'Touch, slide to aim, lift to place; tap ✓ Done to finish'], ['‹ › edge tabs', 'Hide or show the side panels'], ['☰ Panel / Properties', 'Open the side panels on a narrow screen']];
   dialog('Shortcuts & tips', h('div', null, isTouch && h('h3', null, 'Touch'), isTouch && h('div.keys', null, gestures.map(([k, d]) => [h('kbd', null, k), h('span', null, d)])),
     isTouch && h('h3', null, 'Keyboard'), h('div.keys', null, keys.map(([k, d]) => [h('kbd', null, k), h('span', null, d)])),
     h('p.hint', null, 'While drawing a wall, type a length such as 12\'6" or 3.8m and press Enter to place it exactly. Click a piece to select it; a toolbar appears above it with Move, rotate, centre, duplicate and delete. Drag the Move grip (or the piece itself once selected) to move it. In 3D, switch to Walk and use W A S D, or press Photo render for a path-traced image.')));
@@ -430,8 +461,9 @@ function itemProps(items) {
       })()),
     def.note && h('p.hint.note', null, def.note),
     section('Finish', row(def.color2 ? 'Main' : 'Colour', colorInput(it.color, live(v => (it.color = v)), edit(v => (it.color = v)))),
-      def.colors?.length && h('div.presets.retail', null, h('span', null, 'Retailer colours'), def.colors.map(([n, c]) => h('button.named', { title: n, onclick: edit(() => { it.color = c; it.colorName = n; }) }, h('i', { style: { background: c } }), n))),
+      def.colors?.length && h('div.presets.retail', null, h('span', null, 'Retailer colours'), def.colors.map(([n, c]) => h('button.named', { title: n, onclick: edit(() => { it.color = c; if (def.color2 === def.color) it.color2 = c; it.colorName = n; }) }, h('i', { style: { background: c } }), n))),
       def.mat === 'cab' && check('Flat-panel doors (modern)', it.slab, edit(v => (it.slab = v))),
+      it.type === 'shintenchi_island' && check('Leaf raised', it.leafDown !== true, edit(v => (it.leafDown = !v))),
       it.type !== 'model' && !(it.tex ?? def.tex) && h('div.presets', null, h('span', null, 'Wood'), WOODS.map(([n, c]) => h('button', { title: n, style: { background: c }, onclick: edit(() => { if (def.mat === 'bed' || def.mat === 'fabric') it.color2 = c; else it.color = c; it.grain = true; }) }))),
       it.type !== 'model' && !(it.tex ?? def.tex) && check('Show wood grain in 3D', it.grain, edit(v => (it.grain = v))),
       (it.tex ?? def.tex) && row('Surface', selectInput(WALL_FINISHES.filter(f => f.id !== 'paint').map(f => [f.id, f.name]), it.tex ?? def.tex, edit(v => (it.tex = v)))),
@@ -707,7 +739,7 @@ function sketchfabDialog() {
 }
 
 export function initUI() {
-  buildTopbar(); buildRail(); buildLeft(); buildRight(); build2dHud(); build3dHud(); buildStatus(); buildSelectionBar();
+  buildTopbar(); buildRail(); buildLeft(); buildRight(); build2dHud(); build3dHud(); buildStatus(); buildSelectionBar(); buildPanelTabs();
   on('contextmenu', contextMenu); on('toast', toast);
   on('load', () => { $('topbar').querySelector('.docname').value = S.doc.name; });
   $('app').dataset.view = S.prefs.view;

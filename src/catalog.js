@@ -48,6 +48,18 @@ const lSectional = (w, d, h, it = {}) => {
   out.push(rb(rx - arm / 2, sh - 0.14, z0 + sd + (d - sd) / 2, rw - arm - 0.015, 0.14, d - sd - 0.01, 'a+', 0.04));
   return out;
 };
+// Rolling kitchen island: storage body on casters (cabinet door + three drawers) with a drop leaf on the seating side.
+// The listed depth includes the raised leaf; untick "Leaf raised" to fold it down.
+const islandCart = (w, d, h, it = {}) => {
+  const bd = Math.min(d, 0.42), top = 0.025, cast = 0.075, zb = d / 2 - bd / 2, up = it.leafDown !== true, cw = w * 0.5, dx = w / 2 - (w - cw) / 2, dh = (h - top - cast - 0.04) / 3;
+  const out = [...[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sz]) => cy(sx * (w / 2 - 0.05), 0, zb + sz * (bd / 2 - 0.05), 0.06, cast, 'dark')),
+    bx(0, cast, zb, w, h - top - cast, bd, 'a'), bx(0, h - top, up ? 0 : zb, w, top, up ? d : bd, 'b'),
+    bx(-w / 2 + cw / 2, cast + 0.03, d / 2 + 0.006, cw - 0.03, h - top - cast - 0.06, 0.016, 'a+'), bx(-w / 2 + cw - 0.06, cast + (h - cast) * 0.55, d / 2 + 0.018, 0.016, 0.12, 0.02, 'metal')];
+  for (let i = 0; i < 3; i++) { const y = cast + 0.03 + i * dh; out.push(bx(dx, y, d / 2 + 0.006, w - cw - 0.03, dh - 0.015, 0.016, 'a+'), bx(dx, y + dh / 2 - 0.01, d / 2 + 0.018, 0.12, 0.015, 0.02, 'metal')); }
+  if (up) out.push(bx(-w / 2 + 0.12, h - top - 0.12, -d / 2 + (d - bd) / 2 + 0.02, 0.03, 0.1, d - bd - 0.08, 'a-'), bx(w / 2 - 0.12, h - top - 0.12, -d / 2 + (d - bd) / 2 + 0.02, 0.03, 0.1, d - bd - 0.08, 'a-')); // leaf brackets
+  else out.push(bx(0, h - top - (d - bd), zb - bd / 2 - top, w, d - bd, top, 'b')); // leaf hanging down the back
+  return out;
+};
 const table = (w, d, h) => [bx(0, h - 0.04, 0, w, 0.04, d, 'a'), ...legs(w, d, h - 0.04, Math.min(0.06, w * 0.08), 'a-')];
 const roundTable = (w, d, h) => [{ ...cy(0, h - 0.04, 0, w, 0.04, 'a'), d }, cy(0, 0.03, 0, Math.min(0.12, w * 0.15), h - 0.07, 'a-'), { ...cy(0, 0, 0, w * 0.5, 0.03, 'a-'), d: d * 0.5 }];
 const chair = (w, d, h) => { const s = Math.min(0.45, h * 0.5); return [...legs(w, d, s, 0.035, 'b'), bx(0, s, 0, w, 0.06, d, 'a'), bx(0, s + 0.06, -d / 2 + 0.025, w, h - s - 0.06, 0.05, 'a')]; };
@@ -97,7 +109,11 @@ const DEFS = [
   { id: 'rebrilliant_l', name: 'Rebrilliant corduroy L-shaped sectional', cat: 'My picks', w: 111 * IN, d: 67 * IN, h: 32 * IN, color: '#cbb89a', mat: 'fabric', build: lSectional,
     url: 'https://www.wayfair.com/furniture/pdp/rebrilliant-corduroy-l-shaped-sectional-w123144379.html?piid=572712133%2C572712135',
     colors: [],
-    note: 'Size and colour not yet confirmed from the listing: check the Wayfair page and type the exact width, depth and height above.' },
+    note: 'Size and colour not yet confirmed: Wayfair blocks automated reading of this listing. Type the exact width, depth and height from its Specifications tab above.' },
+  { id: 'shintenchi_island', name: 'Shintenchi rolling kitchen island with drop leaf', cat: 'My picks', w: 39.8 * IN, d: 24.8 * IN, h: 35.6 * IN, color: '#f4f3ef', color2: '#f4f3ef', clear: 0.9, build: islandCart,
+    url: 'https://www.amazon.com/dp/B0GY8N9MWN',
+    colors: [['White', '#f4f3ef'], ['Black', '#2a2a2b']],
+    note: 'Listed size: 39.8" W × 24.8" D × 35.6" H with the drop leaf raised (seating side at the back). Cabinet with adjustable shelf, three drawers, locking casters. Size from retailer listings of this model.' },
   // ---------- Living ----------
   { id: 'sofa3', name: 'Sofa, 3-seat', cat: 'Living', w: 2.13, d: 0.92, h: 0.85, color: '#8a9aa3', mat: 'fabric', build: sofa(3) },
   { id: 'sofa2', name: 'Loveseat', cat: 'Living', w: 1.55, d: 0.9, h: 0.85, color: '#8a9aa3', mat: 'fabric', build: sofa(2) },
