@@ -1,4 +1,5 @@
 // Central document store: the plan model, derived geometry, selection, undo history and autosave.
+import { migrate } from './migrate.js';
 import { uid, computeRooms, computeWallGeom, polyArea, polyPerimeter, polyLabelPoint, polyBBox, pointInPoly } from './util.js';
 
 export const S = {
@@ -23,7 +24,7 @@ export function newDoc() {
   return {
     app: 'interior-designer', version: 1, name: 'Untitled plan', units: 'imperial',
     settings: { wallHeight: 2.6, wallThickness: 0.15, wallColor: '#f3f0ea', snap: 0.0254 },
-    walls: [], openings: [], roomMeta: [], items: [], labels: [], dims: [], trace: null,
+    walls: [], openings: [], roomMeta: [], items: [], labels: [], dims: [], trace: null, fixes: ['nook1'],
   };
 }
 
@@ -71,6 +72,7 @@ export function redo() { if (future.length) { past.push(current); current = futu
 export function revert() { if (current) restore(); }
 
 export function setDoc(doc, assets = {}) {
+  migrate(doc);
   S.doc = { ...newDoc(), ...doc, settings: { ...newDoc().settings, ...(doc.settings || {}) } };
   S.assets = assets; S.sel = [];
   derive(true);

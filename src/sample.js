@@ -5,7 +5,7 @@ import { uid, readAsDataURL } from './util.js';
 import { makeItem } from './ops.js';
 
 const SCALE = 0.0128, m = v => +(v * SCALE).toFixed(4), P = (x, y) => ({ x: m(x), y: m(y) });
-const EXT = 0.2, INT = 0.12, GLASS = 0.12, RAIL = 0.06;
+const EXT = 0.2, INT = 0.12, GLASS = 0.12, RAIL = 0.06, NOOK = 0.08;
 
 export function buildSample(mine = false) {
   const doc = newDoc();
@@ -19,8 +19,10 @@ export function buildSample(mine = false) {
   // perimeter
   wall('west', 14, 160, 14, 885, GLASS); wall('south', 14, 885, 428, 885, EXT); wall('bathW', 428, 716, 428, 932, INT); wall('bathS', 428, 932, 672, 932, EXT);
   wall('bathE', 672, 932, 672, 775, EXT); wall('coatW', 672, 775, 672, 716, INT); wall('coatS', 672, 775, 798, 775, EXT); wall('east', 798, 775, 798, 592, EXT);
-  wall('entryN', 798, 592, 745, 592, EXT); wall('wdE', 745, 592, 745, 512, EXT); wall('wdN', 745, 512, 636, 512, EXT); wall('eastUp', 636, 512, 636, 24, EXT);
-  wall('north', 636, 24, 312, 24, GLASS); wall('bedW', 312, 24, 312, 160, GLASS);
+  wall('entryN', 798, 592, 745, 592, EXT); wall('wdE', 745, 592, 745, 512, EXT); wall('wdN', 745, 512, 636, 512, EXT); wall('eastUp', 636, 512, 636, 86, EXT);
+  // bedroom corner: the east wall steps in around a small exterior notch, leaving a little nook by the corner window
+  wall('nookS', 636, 86, 589.5, 86, NOOK); wall('nookW', 589.5, 86, 589.5, 38, NOOK); wall('nookN', 589.5, 38, 636, 38, NOOK); wall('eastTop', 636, 38, 636, 11, EXT);
+  wall('north', 636, 11, 312, 24, GLASS); wall('bedW', 312, 24, 312, 160, GLASS); // the window wall runs slightly askew, as on the plan
   wall('balN', 312, 24, 14, 24, RAIL, { height: 1.1 }); wall('balW', 14, 24, 14, 160, RAIL, { height: 1.1 }); wall('balS', 14, 160, 312, 160, GLASS);
   // interior
   wall('liveE', 312, 160, 312, 328, INT); wall('bed1S', 312, 328, 636, 328, INT); wall('clo1W', 436, 268, 436, 328, INT); wall('clo1N', 436, 268, 636, 268, INT);
@@ -35,7 +37,7 @@ export function buildSample(mine = false) {
   // windows
   for (const p of [110, 245, 370]) open('west', p, 'window', { width: 1.5 });
   for (const p of [528, 650]) open('west', p, 'window', { width: 1.2 });
-  open('north', 76, 'window'); open('north', 236, 'window'); open('bedW', 68, 'window', { width: 1.2 }); open('balS', 96, 'window', { width: 1.8 });
+  for (const p of [51, 148, 244]) open('north', p, 'window', { width: 1.2, height: 2.5, sill: 0.02, style: 'picture' }); // floor-to-ceiling panes between the mullions open('bedW', 68, 'window', { width: 1.2 }); open('balS', 96, 'window', { width: 1.8 });
 
   // rooms (a seed point inside each one carries its name and floor finish)
   const MINE = { Balcony: 'concrete', Bathroom: 'tile', Shaft: 'concrete' }; // dark walnut vinyl plank everywhere else, as in the photos
@@ -63,7 +65,7 @@ export function buildSample(mine = false) {
   // bath
   put('vanity', 455, 792, 270, { w: 1.52 }); put('toilet', 462, 900, 270); put('tub', 633, 782, 90); put('shower', 627, 887, 90);
   // bedroom 1
-  put('bed', 548, 165, 90); put('nightstand', 611, 86, 90); put('nightstand', 611, 242, 90); put('dresser', 338, 150, 270); put('tablelamp', 611, 86, 90);
+  put('bed', 548, 177, 90); put('nightstand', 611, 106, 90); put('nightstand', 611, 250, 90); put('dresser', 338, 150, 270); put('tablelamp', 611, 106, 90);
   // bedroom 2
   put('bed', 165, 796, 180, { color: '#b7c4bd' }); put('nightstand', 82, 859, 180); put('nightstand', 250, 859, 180); put('desk', 262, 631, 0, { w: 1.1 }); put('officechair', 262, 676, 180); put('bookshelf', 44, 760, 270);
   // balcony
