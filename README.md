@@ -25,8 +25,8 @@ The app is touch-ready and can be hosted for free on GitHub Pages:
 2. Open the published link (e.g. `https://<user>.github.io/interior-designer/`) in Safari.
 3. Tap **Share → Add to Home Screen** to launch it full-screen like an app.
 
-Touch gestures: tap to select (then drag to move), drag on empty floor to box-select, **pinch** to zoom,
-**two-finger drag** to pan, **long-press** for the actions menu, and **double-tap** to rename a room, split a wall
+Touch gestures: tap to select (then drag to move), **drag** the floor to pan (with Apple Pencil it box-selects), **pinch** to zoom,
+**two-finger drag** to pan while drawing, **long-press** for the actions menu, and **double-tap** to rename a room, split a wall
 or (in 3D) zoom to a piece. Drawing tools follow your finger and place on lift; tap **✓ Done** to finish.
 The small **‹ ›** tabs on the panel edges hide or show the side panels to give the plan the whole screen; in portrait, **☰ Panel** and **Properties** slide them in. Walk mode shows on-screen arrows.
 Saving on the iPad: work autosaves as you go. **File → Save to My projects** keeps named projects inside the app on

@@ -473,7 +473,8 @@ function toolDown(e) {
           items: items.map(it => ({ it, x: it.x, y: it.y, rot: it.rot })), riders: riders(items).map(it => ({ it, x: it.x, y: it.y })), labels: selOf('label').map(o => ({ o, x: o.x, y: o.y })), refs: wallEndRefs(pts) };
         if (drag.primary?.locked) drag = null;
       }
-    } else drag = { t: 'marquee', a: p, b: null, room: hit, shift: e.shiftKey };
+    } else if (e.pointerType === 'touch') drag = { t: 'pan', m: mouse, cx: view.cx, cy: view.cy, tap: true, room: hit }; // a finger pans like the 3D view; a tap still selects the room
+    else drag = { t: 'marquee', a: p, b: null, room: hit, shift: e.shiftKey };
   } else if (tool === 'wall') {
     const pt = preview || snap(p, { anchor: draft?.from, shift: e.shiftKey });
     placeWallPoint(pt);
@@ -666,7 +667,7 @@ function onUp2(e) {
   const d = drag; drag = null;
   if (!d) return;
   if (d.t === 'touchtool') { mouse = evPos(e); toolDown(e); return; }
-  if (d.t === 'pan') { cv.style.cursor = ''; return; }
+  if (d.t === 'pan') { cv.style.cursor = ''; if (d.tap && dist(evPos(e), d.m) < 8) { select(d.room ? [d.room] : []); requestDraw(); } return; }
   if (d.t === 'marquee') {
     const b = d.b;
     if (!b || dist(w2s(d.a), w2s(b)) < 5) select(d.room ? [d.room] : []);

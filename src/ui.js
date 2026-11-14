@@ -225,7 +225,7 @@ function helpDialog() {
   const keys = [['V', 'Select / move'], ['W', 'Draw walls'], ['A', 'Curved wall (start, end, then bend)'], ['R', 'Rectangle room'], ['D', 'Door'], ['N', 'Window'], ['M', 'Measure / dimension'], ['T', 'Text label'], ['H or Space-drag', 'Pan'], ['Scroll', 'Zoom'], ['F', 'Zoom to fit'],
     ['Q / E', 'Rotate selection 90° (Shift: 15°)'], ['Arrows', 'Nudge (Shift: larger)'], ['Ctrl+D', 'Duplicate'], ['Ctrl+C / V', 'Copy / paste'], ['Del', 'Delete'], ['Ctrl+Z / Y', 'Undo / redo'], ['Ctrl+A', 'Select all furniture'],
     ['G', 'Toggle grid snap'], ['1 / 2 / 3', '2D / split / 3D view'], ['Esc', 'Cancel / deselect'], ['Double-click wall', 'Split wall'], ['Double-click in 3D', 'Zoom in on a piece'], ['Double-click room', 'Rename room'], ['Shift while drawing', 'Lock to 45° steps'], ['Alt while dragging', 'Ignore snapping']];
-  const gestures = [['Tap', 'Select (tap again and drag to move)'], ['Drag on empty floor', 'Box-select'], ['Pinch', 'Zoom'], ['Two-finger drag', 'Pan the plan'], ['Long-press', 'Actions menu (split wall, add door, lock…)'],
+  const gestures = [['Tap', 'Select (tap again and drag to move)'], ['Drag on the floor', 'Pan the plan (Apple Pencil: box-select)'], ['Pinch', 'Zoom'], ['Two-finger drag', 'Pan while drawing'], ['Long-press', 'Actions menu (split wall, add door, lock…)'],
     ['Double-tap', 'Rename room / split wall / zoom to a piece in 3D'], ['Drawing tools', 'Touch, slide to aim, lift to place; tap ✓ Done to finish'], ['‹ › edge tabs', 'Hide or show the side panels'], ['⇄ on the toolbar', 'Flip a sofa between left- and right-hand facing'], ['☰ Panel / Properties', 'Open the side panels on a narrow screen']];
   dialog('Shortcuts & tips', h('div', null, isTouch && h('h3', null, 'Touch'), isTouch && h('div.keys', null, gestures.map(([k, d]) => [h('kbd', null, k), h('span', null, d)])),
     isTouch && h('h3', null, 'Keyboard'), h('div.keys', null, keys.map(([k, d]) => [h('kbd', null, k), h('span', null, d)])),
@@ -611,7 +611,7 @@ function build3dHud() {
 function buildStatus() {
   const hint = h('span.hint'), pos = h('span'), zoom = h('span'), area = h('span');
   $('status').replaceChildren(hint, h('div.grow'), area, pos, zoom);
-  on('status', t => (hint.textContent = t || (isTouch ? 'Long-press for actions · Pinch to zoom · Two fingers to pan · Double-tap a room to rename' : 'Right-click for actions · Scroll to zoom · Space-drag to pan')));
+  on('status', t => (hint.textContent = t || (isTouch ? 'Drag to pan · Pinch to zoom · Long-press for actions · Double-tap a room to rename' : 'Right-click for actions · Scroll to zoom · Space-drag to pan')));
   on('cursor', p => (pos.textContent = `X ${L(p.x)}   Y ${L(p.y)}`));
   const z = () => (zoom.textContent = `${Math.round(ed.view.zoom)} px/m`);
   on('view', z); z();
