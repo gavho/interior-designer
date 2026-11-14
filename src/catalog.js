@@ -113,18 +113,18 @@ const washer = (y, h1) => (w, d) => [bx(0, y, -0.01, w, h1, d - 0.02, 'a'), disc
 const IN = 0.0254;
 const DEFS = [
   // ---------- My picks: real products, sized from the retailer's listing ----------
-  { id: 'asyiah', name: 'Wade Logan Asyiah 114.5" sofa & chaise', cat: 'My picks', w: 114.5 * IN, d: 67 * IN, h: 31 * IN, color: '#5f6b4e', mat: 'fabric', build: sofaChaise,
+  { id: 'asyiah', name: 'Wade Logan Asyiah 114.5" sofa & chaise', cat: 'My picks', w: 114.5 * IN, d: 67 * IN, h: 31 * IN, color: '#5f6b4e', mat: 'fabric', hand: 'right', build: sofaChaise,
     url: 'https://www.wayfair.com/furniture/pdp/wade-logan-asyiah-1145-wide-microfiber-sofa-chaise-w011334397.html?piid=1570405339%2C1586255537',
     colors: [['Green corduroy', '#5f6b4e']],
-    note: 'Listed size: 114.5" W × 67" D × 31" H; chaise 44" W; seat 18" high; arms 22" high. Right-hand facing chaise (tick Mirror for left).' },
-  { id: 'rebrilliant_l', name: 'Rebrilliant corduroy L-shaped sectional', cat: 'My picks', w: 111 * IN, d: 67 * IN, h: 32 * IN, color: '#cbb89a', mat: 'fabric', build: lSectional,
+    note: 'Listed size: 114.5" W × 67" D × 31" H; chaise 44" W; seat 18" high; arms 22" high. Comes right- or left-hand facing: switch it under Chaise side.' },
+  { id: 'rebrilliant_l', name: 'Rebrilliant corduroy L-shaped sectional', cat: 'My picks', w: 111 * IN, d: 67 * IN, h: 32 * IN, color: '#cbb89a', mat: 'fabric', hand: 'right', build: lSectional,
     url: 'https://www.wayfair.com/furniture/pdp/rebrilliant-corduroy-l-shaped-sectional-w123144379.html?piid=572712133%2C572712135',
     colors: [],
     note: 'Size and colour not yet confirmed: Wayfair blocks automated reading of this listing. Type the exact width, depth and height from its Specifications tab above.' },
-  { id: 'zone_sectional', name: 'Living Spaces Zone 4-piece modular sectional', cat: 'My picks', w: 123.62 * IN, d: 85.82 * IN, h: 36.22 * IN, color: '#ece4d4', mat: 'fabric', build: modularL,
+  { id: 'zone_sectional', name: 'Living Spaces Zone 4-piece modular sectional', cat: 'My picks', w: 123.62 * IN, d: 85.82 * IN, h: 36.22 * IN, color: '#ece4d4', mat: 'fabric', hand: 'right', build: modularL,
     url: 'https://www.livingspaces.com/pdp-zone-cream-4-piece-modular-sectional-with-2-corners-1-armless-chair-ottoman-320081',
     colors: [['Cream (SKU 320081)', '#ece4d4'], ['Green (SKU 357981)', '#7f8a6a'], ['Blue (SKU 319543)', '#7d91a6']],
-    note: 'Listed size: 123.62" W × 85.82" D × 36.22" H; seat 7.87" high; 18" interior back. Two 43.3" corners + armless chair along the back, ottoman in front of one corner (tick Mirror to move it to the left). Swatch colours are approximate.' },
+    note: 'Listed size: 123.62" W × 85.82" D × 36.22" H; seat 7.87" high; 18" interior back. Two 43.3" corners + armless chair along the back, ottoman in front of one corner (switch sides under Chaise side). Swatch colours are approximate.' },
   { id: 'shintenchi_island', name: 'Shintenchi rolling kitchen island with drop leaf', cat: 'My picks', w: 39.8 * IN, d: 24.8 * IN, h: 35.6 * IN, color: '#f4f3ef', color2: '#f4f3ef', clear: 0.9, build: islandCart,
     url: 'https://www.amazon.com/dp/B0GY8N9MWN',
     colors: [['White', '#f4f3ef'], ['Black', '#2a2a2b']],
@@ -132,7 +132,7 @@ const DEFS = [
   // ---------- Living ----------
   { id: 'sofa3', name: 'Sofa, 3-seat', cat: 'Living', w: 2.13, d: 0.92, h: 0.85, color: '#8a9aa3', mat: 'fabric', build: sofa(3) },
   { id: 'sofa2', name: 'Loveseat', cat: 'Living', w: 1.55, d: 0.9, h: 0.85, color: '#8a9aa3', mat: 'fabric', build: sofa(2) },
-  { id: 'sectional', name: 'Sectional sofa', cat: 'Living', w: 2.7, d: 1.65, h: 0.85, color: '#9a9388', mat: 'fabric', build: sectional },
+  { id: 'sectional', name: 'Sectional sofa', cat: 'Living', w: 2.7, d: 1.65, h: 0.85, color: '#9a9388', mat: 'fabric', hand: 'right', build: sectional },
   { id: 'armchair', name: 'Armchair', cat: 'Living', w: 0.86, d: 0.86, h: 0.85, color: '#b08d6e', mat: 'fabric', build: sofa(1) },
   { id: 'ottoman', name: 'Ottoman', cat: 'Living', w: 0.6, d: 0.6, h: 0.42, color: '#b08d6e', mat: 'fabric', build: (w, d, h) => [...legs(w, d, 0.08, 0.04, 'dark'), bx(0, 0.08, 0, w, h - 0.08, d, 'a'), bx(0, h, 0, w - 0.06, 0.015, d - 0.06, 'a+')] },
   { id: 'beanbag', name: 'Bean bag', cat: 'Living', w: 0.9, d: 0.9, h: 0.7, color: '#c96f4a', mat: 'fabric', build: (w, d, h) => [sp(0, 0, 0, w, h * 0.75, d, 'a'), sp(0, h * 0.3, -d * 0.15, w * 0.7, h * 0.7, d * 0.6, 'a+')] },

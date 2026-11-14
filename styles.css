@@ -268,3 +268,7 @@ kbd { font: 11px ui-monospace, Consolas, monospace; background: #eef0f3; border:
 .panel-tab.r { border-radius: 9px 0 0 9px; border-right: 0; }
 @media (pointer: coarse) { .panel-tab { width: 28px; height: 64px; font-size: 20px; } }
 @media print { .panel-tab { display: none; } }
+
+.seg2 { display: flex; gap: 4px; background: #f0f2f5; border-radius: 8px; padding: 3px; }
+.seg2 button { flex: 1; border-color: transparent; background: transparent; font-size: 12.5px; padding: 6px 4px; }
+.seg2 button.on { background: #fff; border-color: var(--line); color: var(--accent); font-weight: 600; box-shadow: 0 1px 3px rgba(20, 30, 50, .1); }

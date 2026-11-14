@@ -226,7 +226,7 @@ function helpDialog() {
     ['Q / E', 'Rotate selection 90° (Shift: 15°)'], ['Arrows', 'Nudge (Shift: larger)'], ['Ctrl+D', 'Duplicate'], ['Ctrl+C / V', 'Copy / paste'], ['Del', 'Delete'], ['Ctrl+Z / Y', 'Undo / redo'], ['Ctrl+A', 'Select all furniture'],
     ['G', 'Toggle grid snap'], ['1 / 2 / 3', '2D / split / 3D view'], ['Esc', 'Cancel / deselect'], ['Double-click wall', 'Split wall'], ['Double-click in 3D', 'Zoom in on a piece'], ['Double-click room', 'Rename room'], ['Shift while drawing', 'Lock to 45° steps'], ['Alt while dragging', 'Ignore snapping']];
   const gestures = [['Tap', 'Select (tap again and drag to move)'], ['Drag on empty floor', 'Box-select'], ['Pinch', 'Zoom'], ['Two-finger drag', 'Pan the plan'], ['Long-press', 'Actions menu (split wall, add door, lock…)'],
-    ['Double-tap', 'Rename room / split wall / zoom to a piece in 3D'], ['Drawing tools', 'Touch, slide to aim, lift to place; tap ✓ Done to finish'], ['‹ › edge tabs', 'Hide or show the side panels'], ['☰ Panel / Properties', 'Open the side panels on a narrow screen']];
+    ['Double-tap', 'Rename room / split wall / zoom to a piece in 3D'], ['Drawing tools', 'Touch, slide to aim, lift to place; tap ✓ Done to finish'], ['‹ › edge tabs', 'Hide or show the side panels'], ['⇄ on the toolbar', 'Flip a sofa between left- and right-hand facing'], ['☰ Panel / Properties', 'Open the side panels on a narrow screen']];
   dialog('Shortcuts & tips', h('div', null, isTouch && h('h3', null, 'Touch'), isTouch && h('div.keys', null, gestures.map(([k, d]) => [h('kbd', null, k), h('span', null, d)])),
     isTouch && h('h3', null, 'Keyboard'), h('div.keys', null, keys.map(([k, d]) => [h('kbd', null, k), h('span', null, d)])),
     h('p.hint', null, 'While drawing a wall, type a length such as 12\'6" or 3.8m and press Enter to place it exactly. Click a piece to select it; a toolbar appears above it with Move, rotate, centre, duplicate and delete. Drag the Move grip (or the piece itself once selected) to move it. In 3D, switch to Walk and use W A S D, or press Photo render for a path-traced image.')));
@@ -460,6 +460,8 @@ function itemProps(items) {
           h('p.hint', null, 'Gaps are the clear distance to the facing wall. Type a value to position the piece exactly.')];
       })()),
     def.note && h('p.hint.note', null, def.note),
+    def.hand && section('Chaise side', h('div.seg2', null, [['left', 'Left-hand facing'], ['right', 'Right-hand facing']].map(([v, l]) =>
+      h('button' + (ops.handOf(it) === v ? '.on' : ''), { onclick: () => ops.setHand([it], v) }, l))), h('p.hint', null, 'As you face the front of the sofa: right-hand facing has the chaise on your right.')),
     section('Finish', row(def.color2 ? 'Main' : 'Colour', colorInput(it.color, live(v => (it.color = v)), edit(v => (it.color = v)))),
       def.colors?.length && h('div.presets.retail', null, h('span', null, 'Retailer colours'), def.colors.map(([n, c]) => h('button.named', { title: n, onclick: edit(() => { it.color = c; if (def.color2 === def.color) it.color2 = c; it.colorName = n; }) }, h('i', { style: { background: c } }), n))),
       def.mat === 'cab' && check('Flat-panel doors (modern)', it.slab, edit(v => (it.slab = v))),
@@ -469,7 +471,7 @@ function itemProps(items) {
       (it.tex ?? def.tex) && row('Surface', selectInput(WALL_FINISHES.filter(f => f.id !== 'paint').map(f => [f.id, f.name]), it.tex ?? def.tex, edit(v => (it.tex = v)))),
       def.mat === 'cab' && def.color2 && h('div.presets', null, h('span', null, 'Counter'), COUNTERS.map(([n, c]) => h('button', { title: n, style: { background: c }, onclick: edit(() => (it.color2 = c)) }))),
       (def.color2 || it.color2) && row('Secondary', colorInput(it.color2 || def.color2, live(v => (it.color2 = v)), edit(v => (it.color2 = v)))),
-      h('div.stack', null, check('Mirror', it.flip, edit(v => (it.flip = v))), check('Lock position', it.locked, edit(v => (it.locked = v))),
+      h('div.stack', null, !def.hand && check('Mirror', it.flip, edit(v => (it.flip = v))), check('Lock position', it.locked, edit(v => (it.locked = v))),
         check('Rest on furniture', ops.sits(it), edit(v => { it.on = v; if (v) it.elev = ops.surfaceUnder(it); })))),
     section('Shopping', row('Price', numInput(it.price ?? '', edit(v => (it.price = v || undefined)), { step: 0.01, min: 0 })),
       row('Link', textInput(it.url, edit(v => (it.url = v || undefined)), { placeholder: 'https://…', type: 'url' }), it.url && h('a.go', { href: it.url, target: '_blank', rel: 'noopener' }, '↗')),
@@ -624,6 +626,7 @@ function contextMenu({ x, y, world, hit }) {
   if (hit?.k === 'wall') e.push({ label: 'Split wall here', run: () => ops.splitWall(hit.id, world) }, { label: 'Add door here', run: () => { const w = find('wall', hit.id); ops.addOpening(w.id, dist(w.a, world), { type: 'door' }); commit(); } },
     { label: 'Add window here', run: () => { const w = find('wall', hit.id); ops.addOpening(w.id, dist(w.a, world), { type: 'window' }); commit(); } }, '-');
   if (hit?.k === 'opening' && find('opening', hit.id).type === 'door') { const o = find('opening', hit.id); e.push({ label: 'Flip hinge side', run: edit(() => (o.hinge = o.hinge === 'left' ? 'right' : 'left')) }, { label: 'Flip swing direction', run: edit(() => (o.side = -o.side)) }, '-'); }
+  if (items.some(i => getDef(i.type).hand)) e.push({ label: items.length === 1 ? `Flip to ${ops.handOf(items[0]) === 'right' ? 'left' : 'right'}-hand facing` : 'Switch chaise side', run: () => ops.setHand(items) });
   if (items.length) e.push({ label: 'Rotate 90°', key: 'E', run: () => ops.rotateSelection(90) }, { label: 'Duplicate', key: 'Ctrl+D', run: ops.duplicateSelection }, { label: 'Bring to front', run: () => ops.reorder(true) }, { label: 'Send to back', run: () => ops.reorder(false) },
     { label: items.every(i => i.locked) ? 'Unlock' : 'Lock position', run: edit(() => { const v = !items.every(i => i.locked); items.forEach(i => (i.locked = v)); }) }, '-');
   if (hit?.k === 'room') { const r = find('room', hit.id); e.push({ label: `Rename “${r.meta.name}”…`, run: () => { const n = prompt('Room name:', r.meta.name); if (n) { r.meta.name = n; commit(); } } }, '-'); }
@@ -638,6 +641,7 @@ function buildSelectionBar() {
     const el = h('div.selbar', { style: { display: 'none' } },
       is3d ? h('span', null, 'Drag piece to move') : h('button.grip', { title: 'Drag to move', onpointerdown: e => { e.preventDefault(); ed.beginMove(e); } }, '✥ Move'),
       btn('⟲', () => ops.rotateSelection(-90), { title: 'Rotate left 90° (Q)' }), btn('⟳', () => ops.rotateSelection(90), { title: 'Rotate right 90° (E)' }),
+      h('button.flipbtn', { title: 'Switch chaise side (left / right-hand facing)', onclick: () => ops.setHand(selOf('item')) }, '⇄'),
       btn('⊕', () => ops.centerItems('both'), { title: 'Centre between walls' }), btn('⧉', ops.duplicateSelection, { title: 'Duplicate (Ctrl+D)' }), btn('🗑', ops.deleteSelection, { title: 'Delete (Del)', cls: 'danger' }));
     pane.append(el);
     return el;
@@ -650,6 +654,7 @@ function buildSelectionBar() {
       const pos = it && pane.offsetWidth ? where(it) : null;
       if (!pos) { el.style.display = 'none'; continue; }
       el.style.display = 'flex';
+      const fb = el.querySelector('.flipbtn'), hand = !!getDef(it.type).hand; if (fb.hidden === hand) fb.hidden = !hand;
       el.style.left = clamp(pos.x, 120, Math.max(120, pane.clientWidth - 120)) + 'px'; el.style.top = clamp(pos.y - 58, 50, Math.max(50, pane.clientHeight - 50)) + 'px';
     }
   };

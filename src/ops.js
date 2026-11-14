@@ -1,5 +1,5 @@
 // Editing operations on the document. Each one mutates S.doc and commits an undo step.
-import { S, commit, select, selOf, find } from './state.js';
+import { S, commit, select, selOf, find, emit } from './state.js';
 import { uid, add, sub, mul, dist, rot, norm, dot, perp, projectOnSegment, lineIntersect, normDeg, pointInPoly } from './util.js';
 import { getDef, partsFor } from './catalog.js';
 import { getFloor } from './materials.js';
@@ -10,6 +10,15 @@ const clone = o => JSON.parse(JSON.stringify(o));
 export function makeItem(type, extra = {}) {
   const d = getDef(type);
   return { id: uid('it'), type, name: d.name, x: 0, y: 0, rot: 0, w: d.w, d: d.d, h: d.h, elev: d.elev || 0, color: d.color, ...(d.color2 ? { color2: d.color2 } : {}), ...(d.url ? { url: d.url } : {}), ...extra };
+}
+/** Right-hand facing = chaise on your right as you face the sofa (the catalogue default); flipping mirrors the piece. */
+export const handOf = it => (getDef(it.type).hand ? ((getDef(it.type).hand === 'right') !== !!it.flip ? 'right' : 'left') : null);
+export function setHand(items, hand) {
+  const ch = items.filter(it => getDef(it.type).hand && !it.locked);
+  if (!ch.length) return false;
+  for (const it of ch) it.flip = (hand ?? (handOf(it) === 'right' ? 'left' : 'right')) !== getDef(it.type).hand;
+  commit(); emit('toast', ch.length === 1 ? `Now ${handOf(ch[0])}-hand facing` : 'Chaise side switched');
+  return true;
 }
 export function addItem(item) { S.doc.items.push(item); select([{ k: 'item', id: item.id }]); commit(); return item; }
 
