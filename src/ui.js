@@ -303,7 +303,7 @@ export function printPlan() { const im = $('printimg'); im.onload = () => { prin
 
 function helpDialog() {
   const keys = [['V', 'Select / move'], ['W', 'Draw walls'], ['A', 'Curved wall (start, end, then bend)'], ['R', 'Rectangle room'], ['D', 'Door'], ['N', 'Window'], ['M', 'Measure / dimension'], ['T', 'Text label'], ['O', 'Outlet / jack / switch'], ['K', 'Cable run'], ['H or Space-drag', 'Pan'], ['Scroll', 'Zoom'], ['F', 'Zoom to fit'],
-    ['Q / E', 'Rotate selection 90° (Shift: 15°)'], ['Arrows', 'Nudge (Shift: larger)'], ['Ctrl+D', 'Duplicate'], ['Ctrl+C / V', 'Copy / paste'], ['Del', 'Delete'], ['Ctrl+Z / Y', 'Undo / redo'], ['Ctrl+S', 'Save (to the open file or project)'], ['Ctrl+Shift+S', 'Save as a file'], ['Ctrl+O', 'Open a file'], ['Ctrl+A', 'Select all furniture'],
+    ['Q / E', 'Rotate selection 90° (Shift: 15°, Alt: 1°)'], ['Rotate handle', 'Drag in 1° steps, snapping to the angle of nearby furniture and walls (Shift: 15°, Alt: free)'], ['Arrows', 'Nudge (Shift: larger)'], ['Ctrl+D', 'Duplicate'], ['Ctrl+C / V', 'Copy / paste'], ['Del', 'Delete'], ['Ctrl+Z / Y', 'Undo / redo'], ['Ctrl+S', 'Save (to the open file or project)'], ['Ctrl+Shift+S', 'Save as a file'], ['Ctrl+O', 'Open a file'], ['Ctrl+A', 'Select all furniture'],
     ['G', 'Toggle grid snap'], ['1 / 2 / 3', '2D / split / 3D view'], ['Esc', 'Cancel / deselect'], ['Double-click wall', 'Split wall'], ['Double-click in 3D', 'Zoom in on a piece'], ['Double-click room', 'Rename room'], ['Shift while drawing', 'Lock to 45° steps'], ['Alt while dragging', 'Ignore snapping']];
   const gestures = [['Tap', 'Select (tap again and drag to move)'], ['Drag on the floor', 'Pan the plan (Apple Pencil: box-select)'], ['Pinch', 'Zoom'], ['Two-finger drag', 'Pan while drawing'], ['Long-press', 'Actions menu (split wall, add door, lock…)'],
     ['Double-tap', 'Rename room / split wall / zoom to a piece in 3D'], ['Drawing tools', 'Touch, slide to aim, lift to place; tap ✓ Done to finish'], ['‹ › edge tabs', 'Hide or show the side panels'], ['⇄ on the toolbar', 'Flip a sofa between left- and right-hand facing'], ['☰ Panel / Properties', 'Open the side panels on a narrow screen']];
@@ -588,7 +588,7 @@ function itemProps(items) {
       def.sizes && row('Standard size', selectInput([['', 'Custom'], ...def.sizes.map((s, i) => [String(i), s[0]])], String(def.sizes.findIndex(s => Math.abs(s[1] - it.w) < 0.02 && Math.abs(s[2] - it.d) < 0.02)).replace('-1', ''), edit(v => { if (v !== '') { it.w = def.sizes[v][1]; it.d = def.sizes[v][2]; if (def.sizes[v][3]) it.h = def.sizes[v][3]; } }))),
       row('Width', lenInput(it.w, edit(v => (it.w = Math.max(0.02, v))))), row('Depth', lenInput(it.d, edit(v => (it.d = Math.max(0.02, v))))), row('Height', lenInput(it.h, edit(v => { const on = ops.riders([it]); it.h = Math.max(0.002, v); on.forEach(r => (r.elev = ops.surfaceUnder(r))); }))),
       row('Off floor', lenInput(it.elev || 0, edit(v => { const on = ops.riders([it]), by = Math.max(0, v) - (it.elev || 0); it.elev = Math.max(0, v); on.forEach(r => (r.elev += by)); }))),
-      row('Rotation', numInput(Math.round(it.rot * 10) / 10, edit(v => (it.rot = normDeg(v))), { step: 15 }), h('span.unit', null, '°'))),
+      row('Rotation', numInput(Math.round(it.rot * 10) / 10, edit(v => (it.rot = normDeg(v))), { step: 1 }), h('span.unit', null, '°'))),
     section('Position', (() => {
         const g = ops.itemGaps(it), f = (lab, side) => isFinite(g[side]) && h('label', null, lab, lenInput(Math.max(0, g[side]), v => ops.setItemGap(it, side, v)));
         return [h('div.stack', null, btn('Centre ↔', () => ops.centerItems('x'), { title: 'Centre between the walls to its left and right' }), btn('Centre ↕', () => ops.centerItems('y'), { title: 'Centre between the walls in front and behind' }), btn('Centre both', () => ops.centerItems('both'))),
@@ -606,6 +606,7 @@ function itemProps(items) {
       def.pots && h('div.presets.retail', null, h('span', null, 'Pot'), def.pots.map(([n, c]) => h('button.named', { onclick: edit(() => (it.color2 = c)) }, h('i', { style: { background: c } }), n))),
       def.bedD && check('Opened as a bed', it.bed, edit(v => { it.bed = v; it.d = v ? def.bedD : def.d; })),
       def.shelfOpt && check('Lower shelf', it.shelf, edit(v => (it.shelf = v))),
+      it.type === 'tube_coffee' && check('LED lights under the base', it.led, edit(v => (it.led = v))),
       it.type === 'allewie_bed' && check('Show mattress', !it.noMattress, edit(v => (it.noMattress = !v))),
       it.type === 'shintenchi_island' && check('Leaf raised', it.leafDown !== true, edit(v => (it.leafDown = !v))),
       it.type !== 'model' && !(it.tex ?? def.tex) && h('div.presets', null, h('span', null, 'Wood'), WOODS.map(([n, c]) => h('button', { title: n, style: { background: c }, onclick: edit(() => { if (def.mat === 'bed' || def.mat === 'fabric') it.color2 = c; else it.color = c; it.grain = true; }) }))),
@@ -739,10 +740,12 @@ function build3dHud() {
   const pad = h('div.walkpad', { style: { display: 'none' } },
     h('div.hudgroup', null, hold('◀', 'KeyA', 'Step left'), h('div.walkcol', null, hold('▲', 'KeyW', 'Forward'), hold('▼', 'KeyS', 'Back')), hold('▶', 'KeyD', 'Step right')),
     h('div.hudgroup', null, hold('⟲', 'ArrowLeft', 'Turn left'), hold('⟳', 'ArrowRight', 'Turn right'), btn('Exit', () => api3d.setWalk(false))));
+  const cross = $('pane3d').querySelector('.crosshair') || $('pane3d').appendChild(h('div.crosshair', { style: { display: 'none' } }));
   on('walk', () => {
-    walkB.classList.toggle('on', S.walk); pad.style.display = S.walk ? 'flex' : 'none';
-    S.walk && toast(isTouch ? 'Walk mode — use the arrows to move, drag to look around' : 'Walk mode — W A S D to move, drag to look around, Esc to exit', 4000);
+    walkB.classList.toggle('on', S.walk); pad.style.display = S.walk ? 'flex' : 'none'; cross.style.display = S.walk ? 'block' : 'none';
+    S.walk && !window.interior && toast(isTouch ? 'Walk mode — use the arrows to move, drag to look around' : 'Walk mode — click to look with the mouse · W A S D move · Shift run · C crouch · N fly · wheel speed · Esc exits', 5000);
   });
+  on('walkspeed', v => toast(`Walk speed ${Math.round(v * 100)}%`, 900));
   $('hud3d').replaceChildren(
     h('div.hudgroup', null, btn('Orbit', () => api3d.setCamera('iso'), { title: 'Reset to an overview' }), btn('Top', () => api3d.setCamera('top')), btn('Front', () => api3d.setCamera('front')), walkB),
     h('div.hudgroup', null, h('span', null, 'Walls'), selectInput([['auto', 'Cut-away'], ['full', 'All'], ['none', 'Hidden']], 'auto', v => api3d.setWallMode(v)),

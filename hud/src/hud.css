@@ -1,0 +1,26 @@
+/* Tailwind without its global reset (the host app has its own styles). Utilities are !important so the app's
+   element rules (button, input…) never win inside the HUD; the scoped reset below clears what they would leak in. */
+@import "tailwindcss/theme.css";
+@import "tailwindcss/utilities.css" important;
+@source "./";
+
+@theme {
+  --font-hud: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --color-hud: rgb(14 18 26 / 0.62);
+  --color-hud-line: rgb(255 255 255 / 0.12);
+  --color-accent: #4f8dff;
+}
+
+#walkhud, #walkhud *, #walkhud ::before, #walkhud ::after { box-sizing: border-box; border: 0 solid; margin: 0; padding: 0; }
+#walkhud button, #walkhud input, #walkhud select { all: unset; box-sizing: border-box; }
+#walkhud button { cursor: pointer; }
+#walkhud input[type=range] { appearance: auto; accent-color: #4f8dff; }
+#walkhud input[type=checkbox] { appearance: auto; accent-color: #4f8dff; width: 15px; height: 15px; }
+#walkhud input[type=color] { appearance: auto; width: 34px; height: 28px; padding: 0; border-radius: 6px; cursor: pointer; }
+#walkhud img { display: block; }
+#walkhud { font-family: var(--font-hud); color: #f2f5fa; -webkit-font-smoothing: antialiased; }
+
+/* the host's own walk controls step aside while the HUD is up */
+#pane3d.hud-on > .hud { display: none; }
+@media (pointer: fine) { #pane3d.hud-on .walkpad { display: none !important; } }
+#pane3d.photo .hud, #pane3d.photo .walkpad, #pane3d.photo .crosshair, #pane3d.photo .perf3d, #pane3d.photo #walkhud { display: none !important; }

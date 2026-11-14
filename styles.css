@@ -285,3 +285,7 @@ i.swatch { display: inline-block; width: 11px; height: 11px; border-radius: 3px;
 .schedrow small, .listrow small { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .schedrow .len { text-align: right; display: grid; font-weight: 600; font-variant-numeric: tabular-nums; }
 .list { display: grid; gap: 3px; max-height: 260px; overflow: auto; }
+/* walk mode: crosshair and the F3 performance read-out */
+.crosshair { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; pointer-events: none;
+  background: linear-gradient(#fff, #fff) center / 2px 14px no-repeat, linear-gradient(#fff, #fff) center / 14px 2px no-repeat; filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, .7)); opacity: .85; }
+.perf3d { position: absolute; left: 10px; top: 10px; pointer-events: none; font: 12px/1.4 ui-monospace, monospace; color: #e8f0ff; background: rgba(15, 20, 30, .7); padding: 4px 8px; border-radius: 6px; }

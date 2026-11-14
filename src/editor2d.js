@@ -688,9 +688,12 @@ function onDrag(e, p) {
     const nw = nearestWall(p, 0.8), o = d.o;
     if (nw && nw.g.len > o.width) { o.wallId = nw.w.id; o.pos = clamp(gs(nw.pos), o.width / 2, nw.g.len - o.width / 2); d.moved = true; touch(); }
   } else if (d.t === 'rotate') {
-    const v = sub(p, d.it); let a = deg(Math.atan2(v.y, v.x)) - 90;
-    if (!e.altKey) a = Math.round(a / (e.shiftKey ? 45 : 5)) * (e.shiftKey ? 45 : 5);
-    d.it.rot = normDeg(a); d.moved = true; status(`Rotation ${Math.round(d.it.rot)}°`); touch();
+    const v = sub(p, d.it); let a = normDeg(deg(Math.atan2(v.y, v.x)) - 90), to = null;
+    guides = [];
+    if (e.shiftKey) a = Math.round(a / 15) * 15;
+    else if (!e.altKey) { to = angleSnap(d.it, a); a = to ? to.a : Math.round(a); }
+    d.it.rot = normDeg(a); d.moved = true;
+    status(`Rotation ${+d.it.rot.toFixed(1)}°${to?.name ? ` · lined up with ${to.name}` : ''}`); touch();
   } else if (d.t === 'resize') {
     const it = d.it, l = rot(sub({ x: gs(p.x), y: gs(p.y) }, d.fixed), -it.rot);
     it.w = Math.max(0.05, d.sx * l.x); it.d = Math.max(0.05, d.sy * l.y);
@@ -724,6 +727,25 @@ function centerGuides(it) {
     guides.push([sub(it, mul(g[v], ext)), add(it, mul(g[v], ext))]);
     status('Centred between walls');
   }
+}
+
+/** Snap a rotation to the square, or to any other piece's or wall's angle (and its right angles) within a few degrees; draws pink guides along the shared axis. */
+function angleSnap(it, a, tol = 3) {
+  const off = (x, y) => Math.abs(((x - y) % 90 + 135) % 90 - 45); // gap to the nearest of x, x±90, x+180
+  let best = off(0, a) < tol ? { a: Math.round(a / 90) * 90, gap: off(0, a) } : null;
+  const consider = (ang, name, at, ext, far) => {
+    const gap = off(ang, a);
+    if (gap >= tol || (best && (gap > best.gap + 0.01 || (gap > best.gap - 0.01 && best.far <= far)))) return;
+    best = { a: a + ((ang - a) % 90 + 135) % 90 - 45, gap, name, at, ext, far };
+  };
+  for (const o of S.doc.items) if (o !== it && !getDef(o.type).flat) consider(o.rot || 0, o.name || getDef(o.type).name, o, Math.max(o.w, o.d) / 2 + 0.3, dist(o, it));
+  for (const w of S.doc.walls) { const pr = projectOnSegment(it, w.a, w.b); consider(deg(Math.atan2(w.b.y - w.a.y, w.b.x - w.a.x)), 'the wall', mul(add(w.a, w.b), 0.5), dist(w.a, w.b) / 2, pr.dist + 0.5); }
+  if (!best) return null;
+  if (best.at) {
+    const dir = rot({ x: 1, y: 0 }, best.a), mine = Math.max(it.w, it.d) / 2 + 0.3;
+    guides.push([sub(best.at, mul(dir, best.ext)), add(best.at, mul(dir, best.ext))], [sub(it, mul(dir, mine)), add(it, mul(dir, mine))]);
+  }
+  return best;
 }
 
 /** Start moving the selected furniture from an external control (the Move grip on the selection toolbar). */

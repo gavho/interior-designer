@@ -82,6 +82,29 @@ The **Power** tab and the two tools at the bottom of the tool rail (O, K) add an
   npm run dist       # build an installer for this computer (macOS .dmg, Windows .exe, Linux AppImage)
   ```
 
+## Walk mode: build from first person
+
+In 3D, **Walk** puts you in the room: click the view to look with the mouse, **W A S D** to move, **Shift** to run,
+**C** to crouch, **N** to fly, the mouse wheel for speed. Walls and furniture block you; doorways don't. **F3** shows the
+frame rate and draw calls.
+
+On the hosted (`npm start`) and desktop versions a game-style HUD adds building while you walk. Build it once:
+
+```bash
+npm run hud        # installs and builds hud/ (React + Tailwind); `npm run hud:watch` rebuilds on save
+```
+
+- **Build (B)**: a see-through preview follows the crosshair; click to place. **1–9** / wheel pick from the hotbar,
+  **T** opens the catalogue to fill a slot, **R** rotates (Shift 90°), right-click copies the piece you're looking at into the slot.
+  Wall pieces (mirrors, TVs, cabinets) land on the wall you look at.
+- **Move (E)**: click a piece to pick it up and carry it (things on it come along), click to put it down, right-click cancels.
+  **F** duplicates, **X** deletes.
+- **Paint (P)**: click a wall side or a floor; **T** opens the palette, right-click samples a wall's colour.
+- Minimap (click it with the mouse free to jump there), **O** settings (sensitivity, field of view, quality, keys),
+  **Tab** hides the HUD, **F1** photo mode, **Ctrl+Z** undo.
+
+Without the build (GitHub Pages) walk mode keeps its plain controls.
+
 See [docs/PLAN.md](docs/PLAN.md) for what comes next (render presets, material editor, custom catalogue, layers,
 elevation views, circuits and auto-routed cables).
 
