@@ -3,7 +3,7 @@
 // piece can be resized freely. Local axes: x = width, y = up, z = depth (back of the piece is -z).
 import { shade, rad } from './util.js';
 
-import { bx, rb, cy, sp, disc, legs } from './parts.js';
+import { bx, rb, cy, sp, disc, legs, stalk } from './parts.js';
 import { OFFICE, DESK, MORE, standDesk } from './catalog-extra.js';
 
 const sofa = n => (w, d, h) => {
@@ -125,6 +125,38 @@ const mediaStand = (w, d, h) => {
   for (const sx of [-1, 1]) out.push(bx(sx * (w / 2 - cw / 2), lg + 0.015, d / 2 - 0.004, cw - 0.025, h - lg - 0.045, 0.012, 'b'), bx(sx * (w / 2 - cw + 0.04), lg + (h - lg) / 2 - 0.04, d / 2 + 0.008, 0.012, 0.08, 0.015, 'metal'));
   return out;
 };
+// Arc floor lamp: weighted base at one end, upright pole (wood lower section), arc reaching over to a dome shade at the other end.
+const arcLamp = (w, d, h) => {
+  const bxp = -w / 2 + d / 2, ph = h * 0.62, R = Math.min(w - d / 2 - 0.15, h - ph - 0.12), n = 14, out = [cy(bxp, 0, 0, d * 0.85, 0.05, 'b'), cy(bxp, 0.05, 0, 0.035, ph * 0.45, 'a'), cy(bxp, 0.05 + ph * 0.45, 0, 0.025, ph * 0.55 - 0.05, 'b')];
+  for (let i = 0; i < n; i++) { // quarter-ish arc from the pole top over to the shade
+    const a0 = (i / n) * Math.PI * 0.62, a1 = ((i + 1) / n) * Math.PI * 0.62, x0 = bxp + R - R * Math.cos(a0), y0 = ph + R * Math.sin(a0) * 0.9, x1 = bxp + R - R * Math.cos(a1), y1 = ph + R * Math.sin(a1) * 0.9;
+    out.push(stalk(x0, y0, 0, 0.022, Math.hypot(x1 - x0, y1 - y0) + 0.004, 'b', Math.atan2(-(x1 - x0), y1 - y0)));
+  }
+  const sx = bxp + R - R * Math.cos(Math.PI * 0.62), sy = ph + R * Math.sin(Math.PI * 0.62) * 0.9;
+  out.push(stalk(sx, sy - 0.12, 0, 0.02, 0.12, 'b'), cy(sx, sy - 0.32, 0, Math.min(d, 0.4), 0.22, 'b', { t: 0.35 }), cy(sx, sy - 0.33, 0, Math.min(d, 0.4) * 0.9, 0.01, 'led'));
+  return out;
+};
+// Three framed canvases hung side by side (each w/3 minus gaps): black wood frames, dark canvas with a gold ring.
+const triptych = (w, d, h) => {
+  const gap = 0.05, pw = (w - 2 * gap) / 3, out = [];
+  for (let i = 0; i < 3; i++) {
+    const x = -w / 2 + pw / 2 + i * (pw + gap), f = 0.025;
+    out.push(bx(x, 0, 0, pw, h, d, 'b'), bx(x, f, d / 2 - 0.004, pw - 2 * f, h - 2 * f, 0.008, 'a'));
+    const r = Math.min(pw, h) * (0.62 - i * 0.08);
+    out.push(disc(x + (i - 1) * pw * 0.06, h * (0.45 + i * 0.05) - r / 2, d / 2 + 0.004, r, 0.004, '#c9a54a'), disc(x + (i - 1) * pw * 0.06, h * (0.45 + i * 0.05) - r / 2 + r * 0.04, d / 2 + 0.006, r * 0.92, 0.004, 'a'));
+  }
+  return out;
+};
+// Leaning ladder bookshelf: two black rails leaning back to the wall, five walnut shelves that get shallower towards the top.
+const ladderShelf = (w, d, h) => {
+  const zf = d / 2 - 0.03, zb = -d / 2 + 0.02, lean = Math.atan2(zf - zb, h), len = Math.hypot(zf - zb, h), out = [];
+  for (const s of [-1, 1]) out.push(stalk(s * (w / 2 - 0.015), 0, zf - (zf - zb) / 2 * 0 , 0.03, len, 'b', 0, -lean));
+  for (let i = 0; i < 5; i++) {
+    const y = 0.06 + i * (h - 0.12) / 4, zr = zf - (zf - zb) * (y / h), sd = Math.max(0.12, zr - zb + 0.02);
+    out.push(bx(0, y, zb + sd / 2 - 0.01, w - 0.04, 0.022, sd, 'a'), bx(0, y - 0.015, zb + sd / 2 - 0.01, w - 0.04, 0.015, 0.02, 'b'));
+  }
+  return out;
+};
 const table = (w, d, h) => [bx(0, h - 0.04, 0, w, 0.04, d, 'a'), ...legs(w, d, h - 0.04, Math.min(0.06, w * 0.08), 'a-')];
 const roundTable = (w, d, h) => [{ ...cy(0, h - 0.04, 0, w, 0.04, 'a'), d }, cy(0, 0.03, 0, Math.min(0.12, w * 0.15), h - 0.07, 'a-'), { ...cy(0, 0, 0, w * 0.5, 0.03, 'a-'), d: d * 0.5 }];
 const chair = (w, d, h) => { const s = Math.min(0.45, h * 0.5); return [...legs(w, d, s, 0.035, 'b'), bx(0, s, 0, w, 0.06, d, 'a'), bx(0, s + 0.06, -d / 2 + 0.025, w, h - s - 0.06, 0.05, 'a')]; };
@@ -200,6 +232,43 @@ const DEFS = [
     url: 'https://www.homedepot.com/pep/Meyer-Cross-Dorian-58-in-Alder-White-TV-Stand-Fits-TV-s-up-to-65-in-TV2306/333200763',
     colors: [['Alder White', '#f3f1ec']],
     note: 'Listed size: 58" W × 15.75" D × 16" H, for TVs up to 65". Door and shelf layout is approximate: Home Depot could not be read from here.' },
+  // ---------- Office ideas: real products to try out (sizes from the retailers' listings) ----------
+  { id: 'oi_slat_walnut', like: 'wallpanel', name: 'Acoustic wood slat panel 24" × 94.5" (set of 2)', cat: 'Office ideas', w: 24 * IN, d: 0.875 * IN, h: 94.5 * IN, elev: 0.01, color: '#b88f73',
+    url: 'https://www.walmart.com/ip/15380871814', colors: [['American walnut', '#b88f73'], ['Oak', '#ffffff'], ['Teak', '#e2bb93']],
+    note: '24" × 94.5" × 7/8" per panel on black acoustic felt; sold as 2 panels (31 sq ft). Duplicate it to cover a whole wall. Oak and teak are separate listings.' },
+  { id: 'oi_hex_light', like: 'hexpanels', name: 'Nanoleaf Shapes hexagon light panels (9-pack)', cat: 'Office ideas', w: 36 * IN, d: 0.4 * IN, h: 24 * IN, elev: 1.2, color: '#1d1d1f', color2: '#ffb36b',
+    url: 'https://www.currys.co.uk/products/nanoleaf-shapes-hexagon-smart-lights-starter-kit-ultra-black-pack-of-9-10258070.html', colors: [['Ultra Black', '#1d1d1f'], ['White', '#f2f2f0']],
+    note: 'Each hexagon is 9" × 7.75", 0.4" thick when mounted; nine panels, colour-changing. The overall size here is one possible layout. Link is a UK listing; the same kit is sold by Best Buy and Amazon in the US.' },
+  { id: 'oi_triptych', like: 'art', name: 'IDEA4WALL dark wood rings framed canvas set (3 × 24" × 36")', cat: 'Office ideas', w: 76 * IN, d: 1.5 * IN, h: 36 * IN, elev: 1.0, color: '#3b2f27', color2: '#141416', build: triptych,
+    url: 'https://www.walmart.com/ip/IDEA4WALL-Framed-Canvas-Print-Wall-Art-Set-Gold-Black-Dark-Wood-Rings-Landscape-Abstract-Modern-Minimalist-Chic-Relax-Calm-Living-Room-Bedroom-Office/5311087156',
+    colors: [['Gold & black dark wood rings', '#3b2f27']], note: 'Three 24" × 36" framed canvases in black frames; shown with 2" between them. Artwork in the model is a stand-in for the print.' },
+  { id: 'oi_float_shelf', like: 'shelf', name: 'Latitude Run 36" floating shelves, walnut (set of 2)', cat: 'Office ideas', w: 36 * IN, d: 8 * IN, h: 1.6 * IN, elev: 1.45, color: '#6b4a35',
+    url: 'https://www.wayfair.com/storage-organization/pdp/latitude-run-2-piece-pine-floating-shelf-w112939997.html', colors: [['Walnut', '#6b4a35']],
+    note: '36" W × 8" D × 1.6" H, hidden brackets; set of 2 (duplicate for the second shelf).' },
+  { id: 'oi_bracket_shelf', like: 'shelf_bracket', name: 'Del Hutson 36" dark walnut shelves with black brackets (set of 2)', cat: 'Office ideas', w: 36 * IN, d: 7 * IN, h: 5.5 * IN, elev: 1.3, color: '#5a3b28', color2: '#1b1b1d',
+    url: 'https://www.homedepot.com/p/Del-Hutson-Designs-Industrial-Grace-Simple-5-5in-x-36in-x-7in-Dark-Walnut-Pine-Wood-Set-of-2-Floating-Decorative-Wall-Shelves-with-Brackets-DHD3112dw/310698160',
+    colors: [['Dark walnut', '#5a3b28']], note: '36" W × 7" D × 5.5" H including the black industrial brackets; set of 2.' },
+  { id: 'oi_ladder', name: 'Nathan James Theo 5-shelf ladder bookshelf', cat: 'Office ideas', w: 23.6 * IN, d: 11.7 * IN, h: 72.5 * IN, color: '#6b4a35', color2: '#1b1b1d', mat: 'wood', build: ladderShelf,
+    url: 'https://nathanjames.com/products/5-shelf-ladder-bookshelf-walnut-matte-black', colors: [['Walnut / matte black', '#6b4a35']],
+    note: '23.6" W × 11.7" D × 72.5" H; leans against the wall and screws to it. Push it flush to a wall.' },
+  { id: 'oi_arc_lamp', name: 'Adesso Ethan arc floor lamp (black / walnut)', cat: 'Office ideas', w: 56 * IN, d: 17 * IN, h: 76.5 * IN, color: '#6b4a35', color2: '#1b1b1d', build: arcLamp,
+    url: 'https://dulleselectric.com/products/ades_5049-15', colors: [['Black / walnut', '#6b4a35']],
+    note: '76.5" H with a 56" reach and 17" shade. The base sits at the left end; rotate it so the shade hangs over the desk or chair.' },
+  { id: 'oi_sconce', like: 'sconce', name: 'Crate & Barrel Weston walnut wall sconce', cat: 'Office ideas', w: 5 * IN, d: 8.8 * IN, h: 9.7 * IN, elev: 1.55, color: '#26262a', color2: '#6b4a35',
+    url: 'https://crateandbarrel.ca/weston-black-mid-century-modern-wall-sconce-light/s260343', colors: [['Walnut / blackened steel', '#26262a']],
+    note: '9.7" H × 5" W × 8.8" D. Hard-wired; a plug-in alternative is the Globe Electric Tristan (matte black, faux walnut) at Home Depot.' },
+  { id: 'oi_rug', like: 'rug', name: 'Mohawk Home Rowland charcoal rug 5 × 8', cat: 'Office ideas', w: 60 * IN, d: 96 * IN, h: 0.41 * IN, color: '#3a3b3e',
+    url: 'https://www.homedepot.com/p/Mohawk-Home-Rowland-Charcoal-5-ft-x-8-ft-Abstract-Area-Rug-041715/309244700', colors: [['Charcoal', '#3a3b3e']],
+    note: '5 ft × 8 ft, 0.41" pile: low enough for a rolling desk chair.' },
+  { id: 'oi_riser', like: 'riser', name: 'Room & Board wood monitor riser', cat: 'Office ideas', w: 22 * IN, d: 10 * IN, h: 3 * IN, color: '#6b4a35', color2: '#6b4a35',
+    url: 'https://www.roomandboard.com/catalog/office/desktop-organizers/monitor-riser-shelf-in-wood', colors: [['Walnut', '#6b4a35']],
+    note: '22" W × 10" D × 3" H. Place it on a desk; a monitor placed on top sits on it.' },
+  { id: 'oi_fiddle', like: 'plant_fiddle', name: 'Faux fiddle-leaf fig 6 ft in black pot', cat: 'Office ideas', w: 26 * IN, d: 26 * IN, h: 72 * IN, color: '#3f7a45', color2: '#1d1d1f',
+    url: 'https://www.christmascentral.com/potted-artificial-fiddle-leaf-fig-tree-in-black-pot-6', colors: [['Green / black pot', '#3f7a45']], note: '6 ft H × 26" W × 26" D including the black pot.' },
+  { id: 'oi_snake', like: 'plant_snake', name: 'Faux snake plant 34" in black pot', cat: 'Office ideas', w: 12 * IN, d: 12 * IN, h: 34 * IN, color: '#4f7a4a', color2: '#1d1d1f',
+    url: 'https://www.overstock.com/Home-Garden/Sansevieria-Snake-Plant-in-Black-Pot/35179990/product.html', colors: [['Green / black pot', '#4f7a4a']], note: '34" H × 12" W × 12" D with black pot.' },
+  { id: 'oi_olive', like: 'plant', name: 'Faux olive topiary 5 ft in black pot', cat: 'Office ideas', w: 15 * IN, d: 15 * IN, h: 60 * IN, color: '#7d8a5a', color2: '#1d1d1f',
+    url: 'https://www.christmascentral.com/5-olive-topiary-artificial-potted-tree/', colors: [['Olive / black pot', '#7d8a5a']], note: '5 ft H × 15" W × 15" D in a black pot.' },
   { id: 'shintenchi_island', name: 'Shintenchi rolling kitchen island with drop leaf', cat: 'My picks', w: 39.8 * IN, d: 24.8 * IN, h: 35.6 * IN, color: '#f4f3ef', color2: '#f4f3ef', clear: 0.9, build: islandCart,
     url: 'https://www.amazon.com/dp/B0GY8N9MWN',
     colors: [['White', '#f4f3ef'], ['Black', '#2a2a2b']],
@@ -324,6 +393,9 @@ const DEFS = [
 
 export const CATALOG = DEFS;
 export const CATEGORIES = [...new Set(DEFS.map(d => d.cat))];
+// `like: 'other_id'` reuses another piece's model and behaviour (mounting, resting on furniture, textures) with its own size, colours and link
+{ const base = Object.fromEntries(DEFS.map(d => [d.id, d]));
+  DEFS.forEach((d, i) => { if (d.like && base[d.like]) { const { id, name, cat, url, colors, note, sizes, ...b } = base[d.like]; DEFS[i] = { ...b, ...d }; } }); }
 const byId = Object.fromEntries(DEFS.map(d => [d.id, d]));
 export const getDef = type => byId[type] || byId.box;
 

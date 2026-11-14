@@ -42,6 +42,10 @@ stainless slide-in range, over-the-range microwave, dishwasher and French-door f
 starts a fresh copy at any time. The **My picks** catalogue category holds the chosen products at their listed sizes, with
 the retailer's colours under **Finish → Retailer colours**.
 
+**Office ideas** is a shopping assortment to try before buying: walnut acoustic slat panels, hexagon light panels, framed
+canvas art, walnut floating and bracket shelves, a ladder bookshelf, an arc floor lamp, a wall sconce, a charcoal rug, a
+monitor riser and faux plants in black pots. Each piece is sized from its retailer listing and links to it under **Shopping**.
+
 ## What it does
 
 **Build**
