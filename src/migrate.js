@@ -1,6 +1,7 @@
 // One-time fixes for plans saved before a correction to the apartment template, so saved work keeps its furniture.
 import { uid } from './util.js';
 import { buildSample, roomDetails, SCALE as NEW_SCALE } from './sample.js';
+import { makeItem } from './ops.js';
 
 const S = 0.0128, P = (x, y) => ({ x: +(x * S).toFixed(4), y: +(y * S).toFixed(4) });
 const near = (a, b) => Math.abs(a.x - b.x) < 0.02 && Math.abs(a.y - b.y) < 0.02;
@@ -61,7 +62,21 @@ function balconyDoor(doc) {
   if (w) for (const o of doc.openings) if (o.wallId === w.id && o.type === 'door' && o.style === 'single') { o.style = 'glass'; o.height = 2.5; }
 }
 
-const FIXES = [['nook1', bedroomNook], ['layout2', retrace], ['details1', details], ['curtain1', curtain], ['baldoor1', balconyDoor]];
+/** Kitchen as in the photo: uppers over the sink run, track light, taupe cabinets, drawer over the doors left of the range. */
+function kitchen(doc) {
+  const Q = (x, y) => ({ x: x * NEW_SCALE, y: y * NEW_SCALE }), close = (it, x, y) => Math.hypot(it.x - Q(x, y).x, it.y - Q(x, y).y) < 0.15;
+  if (!doc.items.some(i => i.name === 'Over-the-range microwave')) return; // not the apartment kitchen
+  const cabs = doc.items.filter(i => ['basecab', 'sinkcab', 'wallcab'].includes(i.type) && i.color === '#6e5646');
+  for (const c of cabs) c.color = '#6a594d';
+  const left = doc.items.find(i => i.type === 'basecab' && close(i, 470, 357)); if (left) left.drawerTop = true;
+  const up = { color: '#6a594d', color2: '#f1efea', grain: true, slab: true, elev: 1.42, h: 0.98, d: 0.35 };
+  if (!doc.items.some(i => i.type === 'wallcab' && close(i, 617, 402)))
+    doc.items.push(makeItem('wallcab', { ...Q(617, 402), rot: 90, ...up, w: 1.0 }), makeItem('wallcab', { ...Q(617, 480.5), rot: 90, ...up, w: 0.99 }));
+  for (const i of doc.items) if (['range', 'microwave', 'dishwasher', 'fridge'].includes(i.type) && i.color === '#c9ccd1') { i.color = '#aeb3b9'; if (i.type === 'dishwasher') i.color2 = '#aeb3b9'; }
+  if (!doc.items.some(i => i.type === 'track_light')) doc.items.push(makeItem('track_light', { ...Q(540, 445), rot: 0, w: 1.6, name: 'Track light' }));
+}
+
+const FIXES = [['nook1', bedroomNook], ['layout2', retrace], ['details1', details], ['curtain1', curtain], ['baldoor1', balconyDoor], ['kitchen2', kitchen]];
 export function migrate(doc) {
   doc.fixes = doc.fixes || [];
   for (const [id, fn] of FIXES) if (!doc.fixes.includes(id)) { if (Array.isArray(doc.walls)) fn(doc); doc.fixes.push(id); }

@@ -200,13 +200,15 @@ const drawers = (rows, cols = 1) => (w, d, h) => {
   }
   return out;
 };
-const cabinetDoors = (w, d, y0, y1, c = 'a+', slab = false) => { const n = Math.max(1, Math.round(w / 0.48)), cw = w / n, out = [];
+const cabinetDoors = (w, d, y0, y1, c = 'a+', slab = false, pullLow = false) => { const n = Math.max(1, Math.round(w / 0.48)), cw = w / n, out = [];
   for (let i = 0; i < n; i++) { const x = -w / 2 + cw * (i + 0.5); const dw = cw - 0.012, dh = y1 - y0, r = Math.min(0.06, dw * 0.2), z = d / 2 - 0.003; // shaker door: slab + raised frame
-    if (slab) { out.push(bx(x, y0, d / 2 - 0.02, dw, dh, 0.02, c), bx(x, y0 + (y1 - y0 > 0.5 && y0 > 0.5 ? 0.04 : dh - 0.05), d / 2 + 0.008, Math.min(0.16, dw * 0.45), 0.012, 0.02, 'metal')); continue; } // flat-panel door with a bar pull
+    if (slab) { out.push(bx(x, y0, d / 2 - 0.02, dw, dh, 0.02, c), bx(x, y0 + (pullLow ? 0.035 : dh - 0.05), d / 2 + 0.008, Math.min(0.16, dw * 0.45), 0.012, 0.02, 'metal')); continue; } // flat-panel door with a bar pull (along the bottom edge on wall cabinets)
     out.push(bx(x, y0, d / 2 - 0.02, dw, dh, 0.02, c), bx(x - dw / 2 + r / 2, y0, z, r, dh, 0.008, c), bx(x + dw / 2 - r / 2, y0, z, r, dh, 0.008, c), bx(x, y0, z, dw - 2 * r, r, 0.008, c), bx(x, y1 - r, z, dw - 2 * r, r, 0.008, c),
       bx(x + (i % 2 ? -1 : 1) * (dw / 2 - r / 2), (y0 + y1) / 2 - 0.06, d / 2 + 0.008, 0.014, 0.12, 0.022, 'metal')); }
   return out; };
-const baseCab = (w, d, h, it) => [bx(0, 0, -0.04, w, 0.1, d - 0.1, 'dark'), bx(0, 0.1, -0.02, w, h - 0.14, d - 0.04, 'a'), ...cabinetDoors(w, d - 0.02, 0.11, h - 0.05, 'a+', it?.slab), bx(0, h - 0.04, 0, w, 0.04, d, 'b')];
+const baseCab = (w, d, h, it) => [bx(0, 0, -0.04, w, 0.1, d - 0.1, 'dark'), bx(0, 0.1, -0.02, w, h - 0.14, d - 0.04, 'a'),
+  ...(it?.drawerTop ? [...cabinetDoors(w, d - 0.02, 0.11, h - 0.25, 'a+', it?.slab), bx(0, h - 0.24, (d - 0.02) / 2 - 0.02, w - 0.012, 0.18, 0.02, 'a+'), bx(0, h - 0.11, (d - 0.02) / 2 + 0.008, Math.min(0.3, w * 0.45), 0.012, 0.02, 'metal')]
+    : cabinetDoors(w, d - 0.02, 0.11, h - 0.05, 'a+', it?.slab)), bx(0, h - 0.04, 0, w, 0.04, d, 'b')];
 const bookshelf = (w, d, h) => {
   const out = [bx(-w / 2 + 0.015, 0, 0, 0.03, h, d, 'a'), bx(w / 2 - 0.015, 0, 0, 0.03, h, d, 'a'), bx(0, 0, -d / 2 + 0.008, w, h, 0.016, 'a-'), bx(0, h - 0.03, 0, w, 0.03, d, 'a')];
   const n = Math.max(1, Math.round(h / 0.38)), sh = (h - 0.03) / n, cols = ['#8c4a3c', '#3f5f7a', '#d9c9a5', '#56715a', '#c98b3f', '#4a4458'];
@@ -409,7 +411,7 @@ const DEFS = [
   // ---------- Kitchen ----------
   { id: 'basecab', name: 'Base cabinet', cat: 'Kitchen', w: 0.6, d: 0.62, h: 0.9, color: '#f2f0ec', color2: '#3b3d42', mat: 'cab', clear: 0.9, build: baseCab },
   { id: 'sinkcab', name: 'Sink cabinet', cat: 'Kitchen', w: 0.9, d: 0.62, h: 0.9, color: '#f2f0ec', color2: '#3b3d42', mat: 'cab', clear: 0.9, build: (w, d, h) => [...baseCab(w, d, h), bx(0, h - 0.035, 0.02, Math.min(w * 0.7, 0.8), 0.04, d * 0.6, 'steel'), bx(0, h - 0.03, 0.02, Math.min(w * 0.7, 0.8) - 0.06, 0.037, d * 0.6 - 0.06, 'dark'), cy(0, h, -d / 2 + 0.08, 0.035, 0.26, 'metal'), bx(0, h + 0.24, -d / 2 + 0.16, 0.03, 0.025, 0.18, 'metal')] },
-  { id: 'wallcab', name: 'Wall cabinet', cat: 'Kitchen', w: 0.6, d: 0.33, h: 0.76, elev: 1.4, color: '#f2f0ec', mat: 'cab', mount: 'wall', build: (w, d, h, it) => [bx(0, 0, -0.01, w, h, d - 0.02, 'a'), ...cabinetDoors(w, d, 0.01, h - 0.01, 'a+', it?.slab)] },
+  { id: 'wallcab', name: 'Wall cabinet', cat: 'Kitchen', w: 0.6, d: 0.33, h: 0.76, elev: 1.4, color: '#f2f0ec', mat: 'cab', mount: 'wall', build: (w, d, h, it) => [bx(0, 0, -0.01, w, h, d - 0.02, 'a'), ...cabinetDoors(w, d, 0.01, h - 0.01, 'a+', it?.slab, true)] },
   { id: 'island', name: 'Kitchen island', cat: 'Kitchen', w: 1.8, d: 0.95, h: 0.92, color: '#4a5a63', color2: '#ece8e1', mat: 'cab', clear: 0.9, build: (w, d, h) => [bx(0, 0, 0, w - 0.1, 0.1, d - 0.25, 'dark'), bx(0, 0.1, -0.08, w - 0.06, h - 0.14, d - 0.3, 'a'), ...cabinetDoors(w - 0.06, d - 0.3, 0.11, h - 0.05).map(p => ({ ...p, z: p.z - 0.08 })), bx(0, h - 0.04, 0, w, 0.04, d, 'b')] },
   { id: 'fridge', name: 'Refrigerator', cat: 'Kitchen', w: 0.9, d: 0.75, h: 1.78, color: '#c9ccd1', clear: 0.9, build: (w, d, h) => [bx(0, 0, -0.03, w, h, d - 0.06, 'a'), bx(-w / 4, 0.62, d / 2 - 0.035, w / 2 - 0.01, h - 0.63, 0.05, 'a+'), bx(w / 4, 0.62, d / 2 - 0.035, w / 2 - 0.01, h - 0.63, 0.05, 'a+'), bx(0, 0.02, d / 2 - 0.035, w - 0.01, 0.58, 0.05, 'a+'), bx(-0.04, 0.9, d / 2, 0.02, 0.5, 0.04, 'metal'), bx(0.04, 0.9, d / 2, 0.02, 0.5, 0.04, 'metal'), bx(0, 0.52, d / 2, w * 0.5, 0.02, 0.04, 'metal')] },
   { id: 'range', name: 'Range / stove', cat: 'Kitchen', w: 0.76, d: 0.66, h: 0.92, color: '#c9ccd1', clear: 0.9, build: (w, d, h) => [bx(0, 0, -0.01, w, h - 0.02, d - 0.02, 'a'), bx(0, h - 0.02, 0, w, 0.02, d, 'black'), bx(0, 0.12, d / 2 - 0.012, w - 0.06, h * 0.6, 0.016, 'dark'), bx(0, h * 0.74, d / 2, w * 0.7, 0.02, 0.035, 'metal'), bx(0, h, -d / 2 + 0.03, w, 0.1, 0.06, 'a'),
@@ -453,6 +455,10 @@ const DEFS = [
   { id: 'plant', name: 'Floor plant', cat: 'Decor', w: 0.6, d: 0.6, h: 1.3, color: '#4f8a4a', color2: '#c9b79c', build: plant },
   { id: 'plant_small', name: 'Small plant', cat: 'Decor', on: 1, w: 0.28, d: 0.28, h: 0.4, color: '#5f9a58', color2: '#e3ded4', build: plant },
   { id: 'tablelamp', name: 'Table lamp', cat: 'Decor', on: 1, w: 0.3, d: 0.3, h: 0.5, elev: 0.56, color: '#efe6d2', color2: '#b08456', mat: 'accent', build: lamp },
+  { id: 'track_light', name: 'Track light (3 heads)', cat: 'Decor', w: 1.5, d: 0.12, h: 0.16, elev: 2.44, color: '#d9d9d6', mount: 'ceiling',
+    build: (w, d, h) => { const out = [bx(0, h - 0.025, 0, w, 0.025, 0.035, 'a'), cy(0, h - 0.06, 0, 0.05, 0.035, 'a')];
+      for (const x of [-w * 0.4, 0, w * 0.4]) out.push(cy(x, h - 0.08, 0, 0.012, 0.055, 'a'), cy(x, 0.02, 0.01, 0.06, 0.07, 'a', { t: 0.75 }), cy(x, 0.015, 0.01, 0.045, 0.006, 'led'));
+      return out; } },
   { id: 'pendant', name: 'Pendant light', cat: 'Decor', w: 0.45, d: 0.45, h: 0.7, elev: 1.9, color: '#d9b25f', color2: '#2b2d31', mat: 'accent', build: (w, d, h) => [cy(0, 0.25, 0, 0.012, h - 0.25, 'b'), cy(0, 0, 0, w, 0.25, 'a', { t: 0.35 })] },
   { id: 'art', name: 'Wall art', cat: 'Wall decor', w: 0.9, d: 0.04, h: 0.6, elev: 1.25, color: '#c98f6b', color2: '#2b2d31', mat: 'accent', mount: 'wall', build: (w, d, h) => [bx(0, 0, 0, w, h, d * 0.7, 'b'), bx(0, 0.04, d * 0.35, w - 0.08, h - 0.08, 0.004, 'white'), bx(0, 0.09, d * 0.35 + 0.002, w - 0.18, h - 0.18, 0.004, 'a')] },
   { id: 'shelf', name: 'Wall shelf', cat: 'Wall decor', w: 0.9, d: 0.24, h: 0.04, elev: 1.5, color: '#b08456', mat: 'wood', mount: 'wall', build: (w, d, h) => [bx(0, 0, 0, w, h, d, 'a')] },

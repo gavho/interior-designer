@@ -114,12 +114,14 @@ export function roomDetails() {
 }
 
 function furnishMine(put) {
-  const cab = { color: '#6e5646', color2: '#f1efea', grain: true, slab: true }, up = { ...cab, elev: 1.42, h: 0.98, d: 0.35 };
-  put('basecab', 470, 357, 0, { ...cab, w: 0.78 }); put('range', 530, 359, 0, { name: 'Slide-in range (stainless)' }); put('basecab', 595, 357, 0, { ...cab, w: 0.9 });
+  const cab = { color: '#6a594d', color2: '#f1efea', grain: true, slab: true }, up = { ...cab, elev: 1.42, h: 0.98, d: 0.35 }; // taupe-brown woodgrain
+  put('basecab', 470, 357, 0, { ...cab, w: 0.78, drawerTop: true }); put('range', 530, 359, 0, { name: 'Slide-in range (stainless)', color: '#aeb3b9' }); put('basecab', 595, 357, 0, { ...cab, w: 0.9 });
   put('wallcab', 470, 346, 0, { ...up, w: 0.78 }); put('wallcab', 595, 346, 0, { ...up, w: 0.9 });
-  put('wallcab', 530, 346, 0, { ...up, w: 0.76, elev: 1.9, h: 0.5 }); put('microwave', 530, 353, 0, { name: 'Over-the-range microwave', w: 0.76, d: 0.4, h: 0.42, elev: 1.46 });
-  put('sinkcab', 603, 427, 90, { ...cab, w: 1.08 }); put('dishwasher', 603, 493, 90, { color2: '#c9ccd1' }); put('fridge', 610, 556, 90, { w: 0.84, name: 'French-door refrigerator (stainless)' });
+  put('wallcab', 530, 346, 0, { ...up, w: 0.76, elev: 1.9, h: 0.5 }); put('microwave', 530, 353, 0, { name: 'Over-the-range microwave', w: 0.76, d: 0.4, h: 0.42, elev: 1.46, color: '#aeb3b9' });
+  put('sinkcab', 603, 427, 90, { ...cab, w: 1.08 }); put('dishwasher', 603, 493, 90, { color: '#aeb3b9', color2: '#aeb3b9' }); put('fridge', 610, 556, 90, { w: 0.84, name: 'French-door refrigerator (stainless)', color: '#aeb3b9' });
   put('wallcab', 612, 556, 90, { ...up, w: 0.84, d: 0.6, elev: 1.85, h: 0.55 });
+  put('wallcab', 617, 402, 90, { ...up, w: 1.0 }); put('wallcab', 617, 480.5, 90, { ...up, w: 0.99 }); // uppers over the sink and dishwasher, corner to fridge
+  put('track_light', 540, 445, 0, { w: 1.6, name: 'Track light' });
   put('backsplash', 534, 335, 0, { w: 2.48, tex: 'mosaic_glass', h: 0.5 }); put('backsplash', 630, 452, 90, { w: 1.68, tex: 'mosaic_glass', h: 0.5 });
   put('stackwd', 699, 552, 0);
   put('vanity', 462, 797, 270, { w: 1.52 }); put('toilet', 469, 893, 270); put('tub', 633, 788, 90, { w: 1.4 }); put('shower', 613, 892, 90, { w: 0.83, d: 0.93 });
