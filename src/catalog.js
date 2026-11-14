@@ -108,6 +108,17 @@ const flutedDresser = (cols, rows) => (w, d, h) => {
   }
   return out;
 };
+// Rounded "tube" coffee table: a wood frame with soft corners on a recessed plinth, open front and back, split by one divider
+// into a 21.9" and a larger cubby; optional LED strip glowing under the plinth.
+const tubeTable = (w, d, h, it = {}) => {
+  const pl = 2.6 * 0.0254, t = 0.029, bh = h - pl, r = 0.05, dx = -w / 2 + t + 21.9 * 0.0254 + t / 2;
+  const out = [bx(0, 0, 0, w - 0.1, pl, d - 0.08, 'a-'),
+    rb(0, pl + bh - t - 0.01, 0, w, t + 0.01, d, 'a', r), rb(0, pl, 0, w, t + 0.01, d, 'a', r),
+    rb(-w / 2 + t / 2 + 0.01, pl, 0, t + 0.02, bh, d, 'a', r), rb(w / 2 - t / 2 - 0.01, pl, 0, t + 0.02, bh, d, 'a', r),
+    bx(dx, pl + t, 0, t, bh - 2 * t, d - 0.02, 'a')];
+  if (it.led) out.push(bx(0, 0.004, 0, w - 0.09, 0.012, d - 0.07, 'led'));
+  return out;
+};
 // Desk with a two-tone top (wood ends, black centre panel) on black U-frame legs.
 const uFrameDesk = (w, d, h) => {
   const tt = 0.025, lg = 0.05, top = h - tt, out = [bx(-w / 2 + w / 8, top, 0, w / 4, tt, d, 'a'), bx(w / 2 - w / 8, top, 0, w / 4, tt, d, 'a'), bx(0, top, 0, w / 2, tt, d, '#1d1d1f')];
@@ -256,6 +267,9 @@ const DEFS = [
   { id: 'decofy_dresser', name: 'Decofy 47" fluted 6-drawer dresser', cat: 'My picks', w: 47.2 * IN, d: 15.8 * IN, h: 31.5 * IN, color: '#d2b07a', build: flutedDresser(2, 3),
     colors: [['Natural oak', '#d2b07a']],
     note: 'Listed size: 47.2" W × 15.8" D × 31.5" H (diagram: 31.6"); six fluted drawers in two columns with gold handles, 3.94" plinth. Drawers 21.8" × 13.8" × 5.8" inside. Matches the Decofy fluted nightstand.' },
+  { id: 'tube_coffee', name: 'Modern rounded coffee table with open shelves', cat: 'My picks', w: 47.2 * IN, d: 18.9 * IN, h: 18.3 * IN, color: '#5b3f2d', mat: 'wood', build: tubeTable,
+    colors: [['Walnut brown', '#5b3f2d']],
+    note: 'Listed size: 47.2" L × 18.9" W × 18.3" H; 15.7" body on a 2.6" recessed base; open cubbies 13.4" high, the smaller one 21.9" wide. Holds 100 lb on the top and 100 lb on the shelf. Has 16-colour LED lights under the base (tick LED lights).' },
   { id: 'tribesigns_desk', name: 'Tribesigns 63" computer desk', cat: 'My picks', w: 63 * IN, d: 31.5 * IN, h: 29.53 * IN, color: '#7a4e2d', color2: '#1b1b1d', build: uFrameDesk,
     colors: [['Rustic brown / black', '#7a4e2d']],
     note: 'Listed size: 63" × 31.5" × 29.53" H; two-tone top (15.75" wood ends, 31.5" black centre), 1.97" square black metal legs.' },

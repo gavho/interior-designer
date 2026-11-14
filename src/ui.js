@@ -606,6 +606,7 @@ function itemProps(items) {
       def.pots && h('div.presets.retail', null, h('span', null, 'Pot'), def.pots.map(([n, c]) => h('button.named', { onclick: edit(() => (it.color2 = c)) }, h('i', { style: { background: c } }), n))),
       def.bedD && check('Opened as a bed', it.bed, edit(v => { it.bed = v; it.d = v ? def.bedD : def.d; })),
       def.shelfOpt && check('Lower shelf', it.shelf, edit(v => (it.shelf = v))),
+      it.type === 'tube_coffee' && check('LED lights under the base', it.led, edit(v => (it.led = v))),
       it.type === 'allewie_bed' && check('Show mattress', !it.noMattress, edit(v => (it.noMattress = !v))),
       it.type === 'shintenchi_island' && check('Leaf raised', it.leafDown !== true, edit(v => (it.leafDown = !v))),
       it.type !== 'model' && !(it.tex ?? def.tex) && h('div.presets', null, h('span', null, 'Wood'), WOODS.map(([n, c]) => h('button', { title: n, style: { background: c }, onclick: edit(() => { if (def.mat === 'bed' || def.mat === 'fabric') it.color2 = c; else it.color = c; it.grain = true; }) }))),
