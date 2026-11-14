@@ -1,8 +1,8 @@
 // Entry point: boot the store, wire up the editor, UI and (lazily) the 3D view, and global shortcuts.
 import { S, boot, setDoc, setTool, setPref, undo, redo, select } from './state.js';
 import { initEditor, handleKey, zoomFit } from './editor2d.js';
-import { initUI, set3d, setView, toast, saveProject, openProject, printPlan } from './ui.js';
-import { loadSample } from './sample.js';
+import { initUI, set3d, setView, toast, saveToDevice, openProject, printPlan } from './ui.js';
+import { loadMine } from './sample.js';
 import * as ops from './ops.js';
 
 const TOOL_KEYS = { v: 'select', h: 'pan', w: 'wall', a: 'arc', r: 'room', d: 'door', n: 'window', m: 'measure', t: 'label' };
@@ -23,7 +23,7 @@ function onKey(e) {
     if (k === 'v') { ops.paste(); return done(); }
     if (k === 'd') { ops.duplicateSelection(); return done(); }
     if (k === 'a') { select(S.doc.items.filter(i => !i.locked).map(i => ({ k: 'item', id: i.id }))); return done(); }
-    if (k === 's') { saveProject(); return done(); }
+    if (k === 's') { saveToDevice(); return done(); }
     if (k === 'o') { openProject(); return done(); }
     if (k === 'p') { printPlan(); return done(); }
     return;
@@ -40,7 +40,7 @@ function onKey(e) {
 
 async function start() {
   const saved = await boot();
-  if (saved?.doc?.walls) setDoc(saved.doc, saved.assets || {}); else await loadSample();
+  if (saved?.doc?.walls) { setDoc(saved.doc, saved.assets || {}); S.slot = saved.slot || null; } else await loadMine(); // first visit opens the real apartment
   window.app = { S, ops }; // handy from the dev-tools console
   initUI();
   initEditor(document.getElementById('c2d'));

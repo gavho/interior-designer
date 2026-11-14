@@ -1,13 +1,13 @@
 // Application chrome: top bar, tool rail, catalogue / build / style / objects / insights tabs,
 // the properties inspector, dialogs, context menu and toasts.
-import { S, on, emit, commit, touch, undo, redo, canUndo, canRedo, select, selOf, find, setTool, setPref, setDoc, newDoc, exportProject, saveLibrary } from './state.js';
+import { S, on, emit, commit, touch, undo, redo, canUndo, canRedo, select, selOf, find, setTool, setPref, setDoc, newDoc, exportProject, saveLibrary, listProjects, saveSlot, openSlot, deleteSlot } from './state.js';
 import { h, uid, fmtLen, parseLen, fmtArea, fmtMoney, download, readAsDataURL, pickFile, normDeg, dist, clamp, add, sub, mul } from './util.js';
 import { CATALOG, CATEGORIES, getDef, thumbnail } from './catalog.js';
 import { FLOORS, PALETTES, SWATCHES, floorCanvas, WALL_FINISHES, WOODS, COUNTERS } from './materials.js';
 import * as ops from './ops.js';
 import { analyze } from './analysis.js';
 import * as ed from './editor2d.js';
-import { loadSample } from './sample.js';
+import { loadSample, loadMine } from './sample.js';
 
 let api3d = null;
 export const set3d = m => { api3d = m; build3dHud(); };
@@ -115,11 +115,17 @@ export function setView(v) { $('app').dataset.view = v; setPref('view', v); }
 function fileMenu(anchor) {
   const r = anchor.getBoundingClientRect();
   menu(r.left, r.bottom + 4, [
-    { label: 'New plan', run: () => confirm('Start a new empty plan? Save the current one first if you want to keep it.') && setDoc(newDoc()) },
-    { label: 'Open project…', key: 'Ctrl+O', run: openProject },
-    { label: 'Save project (.json)', key: 'Ctrl+S', run: saveProject },
+    { label: 'New empty plan', run: () => confirm('Start a new empty plan? Save the current one first if you want to keep it.') && (setDoc(newDoc()), S.slot = null) },
+    { label: 'New from my apartment (980 sq ft)', run: () => confirm('Start a fresh copy of your apartment? Save the current plan first if you want to keep it.') && loadMine().then(() => { S.slot = null; ed.zoomFit(); toast('Your apartment is ready to furnish'); }) },
     '-',
-    { label: 'Load sample apartment', run: () => loadSample().then(() => { ed.zoomFit(); toast('Sample apartment loaded'); }) },
+    { label: S.slot ? 'Save to My projects' : 'Save to My projects…', key: 'Ctrl+S', run: saveToDevice },
+    { label: 'Save as a new project…', run: () => saveToDevice(true) },
+    { label: 'My projects…', run: projectsDialog },
+    '-',
+    { label: 'Save a copy to Files (.json)', run: saveProject },
+    { label: 'Open from Files…', key: 'Ctrl+O', run: openProject },
+    '-',
+    { label: 'Load sample apartment', run: () => loadSample().then(() => { S.slot = null; ed.zoomFit(); toast('Sample apartment loaded'); }) },
     { label: 'Import floor plan image to trace…', run: importTrace },
     '-',
     { label: 'Export 2D plan (PNG)', run: () => download(`${S.doc.name}-plan.png`, ed.exportPNG()) },
@@ -128,13 +134,43 @@ function fileMenu(anchor) {
     { label: 'Print plan', key: 'Ctrl+P', run: printPlan },
   ]);
 }
-export function saveProject() { download(`${S.doc.name.replace(/[^\w -]+/g, '') || 'plan'}.json`, exportProject(), 'application/json'); toast('Project saved to your downloads'); }
+/** Save into the app's own storage on this device (survives closing Safari; add the app to the Home Screen so iPadOS keeps it). */
+export async function saveToDevice(asNew = false) {
+  let name = S.doc.name;
+  if (asNew === true || !S.slot) { name = prompt('Save this project as:', S.doc.name); if (!name) return; }
+  try { const rec = await saveSlot(name.trim(), asNew === true); toast(`Saved “${rec.name}” to My projects`); }
+  catch { toast('Could not save on this device (storage may be full or blocked in private browsing)', 4000); }
+}
+async function projectsDialog() {
+  const list = await listProjects(), when = t => new Date(t).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+  let close = null;
+  const rows = list.length ? list.map(p => h('div.projrow', null,
+    h('div', null, h('b', null, p.name, p.id === S.slot ? ' (open now)' : ''), h('div.hint', null, `${when(p.saved)} · ${p.rooms || 0} rooms · ${p.items || 0} pieces`)),
+    h('div.stack', null,
+      btn('Open', async () => { try { await openSlot(p.id); ed.zoomFit(); close(); toast(`Opened “${p.name}”`); } catch { toast('That project could not be read'); } }, { cls: 'primary' }),
+      btn('Delete', async () => { if (confirm(`Delete “${p.name}” from this device?`)) { await deleteSlot(p.id); close(); projectsDialog(); } }, { cls: 'danger' }))))
+    : [h('p.hint', null, 'No saved projects yet. Use File → Save to My projects.')];
+  close = dialog('My projects', h('div', null, h('p.hint', null, 'Projects saved on this device. Use “Save a copy to Files” for a backup you can move to another device.'), ...rows),
+    [{ label: 'Save current plan here', run: () => saveToDevice(true) }, { label: 'Close' }]);
+}
+/** A .json copy: on iPad this opens the share sheet so it can go to Files, iCloud Drive, AirDrop or email. */
+export async function saveProject() {
+  const name = `${S.doc.name.replace(/[^\w -]+/g, '') || 'plan'}.json`, data = exportProject();
+  if (isTouch && navigator.canShare) {
+    const file = new File([data], name, { type: 'application/json' });
+    if (navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: S.doc.name }); toast('Project copy saved'); return; }
+      catch (e) { if (e?.name === 'AbortError') return; }
+    }
+  }
+  download(name, data, 'application/json'); toast(isTouch ? 'Saved to Files → Downloads' : 'Project saved to your downloads');
+}
 export async function openProject() {
-  const f = await pickFile('.json,application/json'); if (!f) return;
+  const f = await pickFile(isTouch ? null : '.json,application/json'); if (!f) return; // iPad Files greys out .json when filtered by type
   try {
     const { assets, ...doc } = JSON.parse(await f.text());
     if (!Array.isArray(doc.walls) || !Array.isArray(doc.items)) throw new Error('not a plan');
-    setDoc(doc, assets || {}); ed.zoomFit(); toast(`Opened “${doc.name}”`);
+    setDoc(doc, assets || {}); S.slot = null; ed.zoomFit(); toast(`Opened “${doc.name}”`);
   } catch { toast('That file is not an Interior Designer project'); }
 }
 async function importTrace() {
@@ -392,7 +428,10 @@ function itemProps(items) {
           h('div.dims4', null, f('Left gap', 'left'), f('Right gap', 'right'), f('Back gap', 'back'), f('Front gap', 'front')),
           h('p.hint', null, 'Gaps are the clear distance to the facing wall. Type a value to position the piece exactly.')];
       })()),
+    def.note && h('p.hint.note', null, def.note),
     section('Finish', row(def.color2 ? 'Main' : 'Colour', colorInput(it.color, live(v => (it.color = v)), edit(v => (it.color = v)))),
+      def.colors?.length && h('div.presets.retail', null, h('span', null, 'Retailer colours'), def.colors.map(([n, c]) => h('button.named', { title: n, onclick: edit(() => { it.color = c; it.colorName = n; }) }, h('i', { style: { background: c } }), n))),
+      def.mat === 'cab' && check('Flat-panel doors (modern)', it.slab, edit(v => (it.slab = v))),
       it.type !== 'model' && !(it.tex ?? def.tex) && h('div.presets', null, h('span', null, 'Wood'), WOODS.map(([n, c]) => h('button', { title: n, style: { background: c }, onclick: edit(() => { if (def.mat === 'bed' || def.mat === 'fabric') it.color2 = c; else it.color = c; it.grain = true; }) }))),
       it.type !== 'model' && !(it.tex ?? def.tex) && check('Show wood grain in 3D', it.grain, edit(v => (it.grain = v))),
       (it.tex ?? def.tex) && row('Surface', selectInput(WALL_FINISHES.filter(f => f.id !== 'paint').map(f => [f.id, f.name]), it.tex ?? def.tex, edit(v => (it.tex = v)))),

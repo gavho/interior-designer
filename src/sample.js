@@ -7,9 +7,10 @@ import { makeItem } from './ops.js';
 const SCALE = 0.0128, m = v => +(v * SCALE).toFixed(4), P = (x, y) => ({ x: m(x), y: m(y) });
 const EXT = 0.2, INT = 0.12, GLASS = 0.12, RAIL = 0.06;
 
-export function buildSample() {
+export function buildSample(mine = false) {
   const doc = newDoc();
-  doc.name = 'Sample apartment - 2 bed';
+  doc.name = mine ? 'My apartment - 2 bed, 980 sq ft' : 'Sample apartment - 2 bed';
+  if (mine) doc.settings.wallColor = '#cdc8bf'; // light greige paint, from the photos
   const W = {};
   const wall = (key, x1, y1, x2, y2, thickness, extra = {}) => { W[key] = { id: uid('w'), a: P(x1, y1), b: P(x2, y2), thickness, height: 2.6, ...extra }; doc.walls.push(W[key]); };
   const open = (key, posPx, type, o = {}) => doc.openings.push({ id: uid('op'), wallId: W[key].id, pos: m(posPx), type, style: type === 'door' ? 'single' : 'picture',
@@ -37,14 +38,17 @@ export function buildSample() {
   open('north', 76, 'window'); open('north', 236, 'window'); open('bedW', 68, 'window', { width: 1.2 }); open('balS', 96, 'window', { width: 1.8 });
 
   // rooms (a seed point inside each one carries its name and floor finish)
-  for (const [name, floor, x, y] of [['Balcony', 'deck', 160, 92], ['Bedroom 1', 'carpet', 470, 150], ['Closet', 'carpet', 530, 298], ['Living / Kitchen', 'oak', 250, 400], ['Laundry', 'tile_grey', 690, 552],
+  const MINE = { Balcony: 'concrete', Bathroom: 'tile', Shaft: 'concrete' }; // dark walnut vinyl plank everywhere else, as in the photos
+  for (const [name, floor0, x, y] of [['Balcony', 'deck', 160, 92], ['Bedroom 1', 'carpet', 470, 150], ['Closet', 'carpet', 530, 298], ['Living / Kitchen', 'oak', 250, 400], ['Laundry', 'tile_grey', 690, 552],
     ['Coat closet', 'oak', 735, 745], ['Bathroom', 'tile', 550, 825], ['Bedroom 2', 'carpet_grey', 150, 700], ['Walk-in closet', 'carpet_grey', 360, 800], ['Shaft', 'concrete', 426, 655]])
-    doc.roomMeta.push({ id: uid('rm'), name, floor, px: m(x), py: m(y) });
+  { const floor = mine ? MINE[name] || 'vinyl_walnut' : floor0;
+    doc.roomMeta.push({ id: uid('rm'), name, floor, px: m(x), py: m(y) }); }
 
   const put = (type, x, y, rot = 0, extra = {}) => doc.items.push(makeItem(type, { x: m(x), y: m(y), rot, ...extra }));
   // structure
   for (const [x, y] of [[58, 205], [428, 65], [58, 640]]) put('column', x, y, 0, { w: 0.72, d: 0.72, name: 'Structural column', locked: true });
   put('box', 112, 634, 0, { w: 0.58, d: 0.82, h: 2.6, name: 'Mechanical chase', color: '#cfccc6', locked: true });
+  if (mine) { furnishMine(put); doc.trace = { assetId: 'trace', x: 0, y: 0, scale: SCALE, opacity: 0.45, visible: false }; return doc; }
   // living
   put('rug', 205, 262, 90, { w: 2.74, d: 1.83 }); put('sofa3', 122, 262, 270); put('coffee', 212, 262, 90); put('tvstand', 289, 248, 90); put('tv', 302, 248, 90);
   put('armchair', 215, 385, 180); put('floorlamp', 122, 368); put('plant', 44, 566);
@@ -67,6 +71,34 @@ export function buildSample() {
 
   doc.trace = { assetId: 'trace', x: 0, y: 0, scale: SCALE, opacity: 0.45, visible: false };
   return doc;
+}
+
+// The real unit: kitchen as in the photos (wood-grain flat-panel cabinets, white quartz, linear glass mosaic, stainless appliances),
+// bath and laundry fixtures, and the chosen sofa & chaise. Everything else is left empty to furnish.
+function furnishMine(put) {
+  const cab = { color: '#6e5646', color2: '#f1efea', grain: true, slab: true }, up = { ...cab, elev: 1.42, h: 0.98, d: 0.35 };
+  put('basecab', 470, 357, 0, { ...cab, w: 0.78 }); put('range', 530, 359, 0, { name: 'Slide-in range (stainless)' }); put('basecab', 595, 357, 0, { ...cab, w: 0.9 });
+  put('wallcab', 470, 346, 0, { ...up, w: 0.78 }); put('wallcab', 595, 346, 0, { ...up, w: 0.9 });
+  put('wallcab', 530, 346, 0, { ...up, w: 0.76, elev: 1.9, h: 0.5 }); put('microwave', 530, 353, 0, { name: 'Over-the-range microwave', w: 0.76, d: 0.4, h: 0.42, elev: 1.46 });
+  put('sinkcab', 603, 427, 90, { ...cab, w: 1.08 }); put('dishwasher', 603, 493, 90, { color2: '#c9ccd1' }); put('fridge', 598, 553, 90, { w: 0.84, name: 'French-door refrigerator (stainless)' });
+  put('wallcab', 615, 553, 90, { ...up, w: 0.84, d: 0.6, elev: 1.85, h: 0.55 });
+  put('backsplash', 534, 334, 0, { w: 2.48, tex: 'mosaic_glass', h: 0.5 }); put('backsplash', 627, 452, 90, { w: 1.68, tex: 'mosaic_glass', h: 0.5 });
+  put('stackwd', 690, 551, 0);
+  put('vanity', 455, 792, 270, { w: 1.52 }); put('toilet', 462, 900, 270); put('tub', 633, 782, 90); put('shower', 627, 887, 90);
+  put('asyiah', 172, 524, 180);
+}
+
+/** Start a fresh copy of the real apartment (keeps the current plan in its saved slot, if it has one). */
+export async function loadMine() {
+  const assets = {};
+  try {
+    const r = await fetch('samples/next-chicago-il-floorplan.png');
+    if (r.ok) assets.trace = { name: 'next-chicago-il-floorplan.png', kind: 'image', data: await readAsDataURL(await r.blob()) };
+  } catch {}
+  const doc = buildSample(true);
+  if (!assets.trace) doc.trace = null;
+  setDoc(doc, assets);
+  S.sel = [];
 }
 
 export async function loadSample() {

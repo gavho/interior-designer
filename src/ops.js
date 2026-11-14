@@ -9,7 +9,7 @@ const clone = o => JSON.parse(JSON.stringify(o));
 
 export function makeItem(type, extra = {}) {
   const d = getDef(type);
-  return { id: uid('it'), type, name: d.name, x: 0, y: 0, rot: 0, w: d.w, d: d.d, h: d.h, elev: d.elev || 0, color: d.color, ...(d.color2 ? { color2: d.color2 } : {}), ...extra };
+  return { id: uid('it'), type, name: d.name, x: 0, y: 0, rot: 0, w: d.w, d: d.d, h: d.h, elev: d.elev || 0, color: d.color, ...(d.color2 ? { color2: d.color2 } : {}), ...(d.url ? { url: d.url } : {}), ...extra };
 }
 export function addItem(item) { S.doc.items.push(item); select([{ k: 'item', id: item.id }]); commit(); return item; }
 

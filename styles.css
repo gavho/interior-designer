@@ -244,3 +244,13 @@ kbd { font: 11px ui-monospace, Consolas, monospace; background: #eef0f3; border:
   #app[data-view="split"] #stage { flex-direction: column; }
   #app[data-view="split"] #pane3d { border-left: 0; border-top: 1px solid var(--line); }
 }
+
+/* ---- My projects, retailer colours ---- */
+.projrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+.projrow .hint { margin: 2px 0 0; }
+.projrow .stack { display: flex; gap: 6px; flex: none; }
+.presets.retail { gap: 5px; }
+.presets.retail span { width: 100%; }
+.presets.retail button.named { width: auto; height: auto; display: flex; align-items: center; gap: 6px; padding: 4px 9px 4px 5px; border-color: var(--line); font-size: 12px; }
+.presets.retail i { width: 16px; height: 16px; border-radius: 4px; border: 1px solid rgba(0, 0, 0, .18); }
+.hint.note { background: #f6f3ea; border-radius: 6px; padding: 7px 9px; color: #5d564a; }

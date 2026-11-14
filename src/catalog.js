@@ -3,7 +3,7 @@
 // piece can be resized freely. Local axes: x = width, y = up, z = depth (back of the piece is -z).
 import { shade, rad } from './util.js';
 
-import { bx, cy, sp, disc, legs } from './parts.js';
+import { bx, rb, cy, sp, disc, legs } from './parts.js';
 import { OFFICE, DESK, MORE } from './catalog-extra.js';
 
 const sofa = n => (w, d, h) => {
@@ -23,6 +23,31 @@ const sectional = (w, d, h) => {
     bx(-cw / 2 - 0.0, sh - 0.12, -d / 2 + back + (sd - back) / 2, w - cw - 0.42, 0.14, sd - back - 0.02, 'a+'), bx(w / 2 - cw / 2 - 0.1, sh - 0.12, back / 2, cw - 0.22, 0.14, d - back - 0.02, 'a+'),
     bx(-0.1, sh + 0.02, -d / 2 + back + 0.07, w - 0.44, h - sh - 0.1, 0.14, 'a+'), ...legs(w, sd, b, 0.05, 'dark').map(p => ({ ...p, z: p.z - d / 2 + sd / 2 }))];
 };
+// Sofa with a chaise on the right (as you face it): square arms, tight back, two seat cushions plus the chaise cushion.
+// Sizes follow the item, so the listed overall width / depth / height carry straight through; the chaise width and seat height can be overridden per item.
+const sofaChaise = (w, d, h, it = {}) => {
+  const cw = Math.min(it.chaiseW || 1.118, w * 0.5), sd = Math.min(d, it.seatD || 0.9), sh = it.seatH || 0.457, ah = Math.min(h, it.armH || 0.559), arm = 0.16, back = 0.2, base = 0.09;
+  const z0 = -d / 2, cx = w / 2 - cw / 2, mw = w - cw - arm; // main seat runs from the left arm to the chaise
+  const out = [...legs(w, sd, base, 0.045, 'dark').map(p => ({ ...p, z: p.z + z0 + sd / 2 })), bx(cx, 0, d / 2 - 0.08, 0.045, base, 0.045, 'dark'), bx(-w / 2 + 0.06, 0, z0 + sd - 0.08, 0.045, base, 0.045, 'dark'),
+    bx(0, base, z0 + sd / 2, w, sh - base - 0.13, sd, 'a-'), bx(cx, base, z0 + sd + (d - sd) / 2, cw, sh - base - 0.13, d - sd, 'a-'),
+    bx(0, base, z0 + back / 2, w, h - base, back, 'a'), bx(-w / 2 + arm / 2, base, z0 + sd / 2, arm, ah - base, sd, 'a'), bx(w / 2 - arm / 2, base, 0, arm, ah - base, d, 'a')];
+  for (let i = 0; i < 2; i++) { const pw = mw / 2, px = -w / 2 + arm + pw * (i + 0.5);
+    out.push(bx(px, sh - 0.13, z0 + back + (sd - back) / 2, pw - 0.015, 0.13, sd - back - 0.01, 'a+'), bx(px, sh, z0 + back + 0.06, pw - 0.03, h - sh - 0.06, 0.12, 'a')); }
+  out.push(bx(cx - arm / 2, sh - 0.13, z0 + back + (d - back) / 2, cw - arm - 0.015, 0.13, d - back - 0.01, 'a+'), bx(cx - arm / 2, sh, z0 + back + 0.06, cw - arm - 0.03, h - sh - 0.06, 0.12, 'a'));
+  return out;
+};
+// Corduroy L-shaped sectional: chaise / return on the right, low track arms, loose back pillows.
+const lSectional = (w, d, h, it = {}) => {
+  const rw = Math.min(it.chaiseW || 0.95, w * 0.5), sd = Math.min(d, it.seatD || 0.95), sh = it.seatH || 0.44, arm = 0.18, back = 0.2, base = 0.06, z0 = -d / 2, rx = w / 2 - rw / 2;
+  const out = [bx(0, 0, z0 + sd / 2, w - 0.04, base, sd - 0.04, 'dark'), bx(rx, 0, z0 + sd + (d - sd) / 2, rw - 0.04, base, d - sd - 0.04, 'dark'),
+    rb(0, base, z0 + sd / 2, w, sh - base - 0.14, sd, 'a-', 0.03), rb(rx, base, z0 + sd + (d - sd) / 2, rw, sh - base - 0.14, d - sd, 'a-', 0.03),
+    rb(0, base, z0 + back / 2, w, h * 0.78 - base, back, 'a', 0.04), rb(-w / 2 + arm / 2, base, z0 + sd / 2, arm, sh + 0.12 - base, sd, 'a', 0.05), rb(w / 2 - arm / 2, base, 0, arm, sh + 0.12 - base, d, 'a', 0.05)];
+  const n = 3, mw = w - arm * 2, pw = mw / n;
+  for (let i = 0; i < n; i++) { const px = -w / 2 + arm + pw * (i + 0.5);
+    out.push(rb(px, sh - 0.14, z0 + back + (sd - back) / 2, pw - 0.015, 0.14, sd - back - 0.01, 'a+', 0.04), rb(px, sh - 0.02, z0 + back + 0.08, pw - 0.04, h - sh + 0.02, 0.18, 'a+', 0.06)); }
+  out.push(rb(rx - arm / 2, sh - 0.14, z0 + sd + (d - sd) / 2, rw - arm - 0.015, 0.14, d - sd - 0.01, 'a+', 0.04));
+  return out;
+};
 const table = (w, d, h) => [bx(0, h - 0.04, 0, w, 0.04, d, 'a'), ...legs(w, d, h - 0.04, Math.min(0.06, w * 0.08), 'a-')];
 const roundTable = (w, d, h) => [{ ...cy(0, h - 0.04, 0, w, 0.04, 'a'), d }, cy(0, 0.03, 0, Math.min(0.12, w * 0.15), h - 0.07, 'a-'), { ...cy(0, 0, 0, w * 0.5, 0.03, 'a-'), d: d * 0.5 }];
 const chair = (w, d, h) => { const s = Math.min(0.45, h * 0.5); return [...legs(w, d, s, 0.035, 'b'), bx(0, s, 0, w, 0.06, d, 'a'), bx(0, s + 0.06, -d / 2 + 0.025, w, h - s - 0.06, 0.05, 'a')]; };
@@ -34,12 +59,13 @@ const drawers = (rows, cols = 1) => (w, d, h) => {
   }
   return out;
 };
-const cabinetDoors = (w, d, y0, y1, c = 'a+') => { const n = Math.max(1, Math.round(w / 0.48)), cw = w / n, out = [];
+const cabinetDoors = (w, d, y0, y1, c = 'a+', slab = false) => { const n = Math.max(1, Math.round(w / 0.48)), cw = w / n, out = [];
   for (let i = 0; i < n; i++) { const x = -w / 2 + cw * (i + 0.5); const dw = cw - 0.012, dh = y1 - y0, r = Math.min(0.06, dw * 0.2), z = d / 2 - 0.003; // shaker door: slab + raised frame
+    if (slab) { out.push(bx(x, y0, d / 2 - 0.02, dw, dh, 0.02, c), bx(x, y0 + (y1 - y0 > 0.5 && y0 > 0.5 ? 0.04 : dh - 0.05), d / 2 + 0.008, Math.min(0.16, dw * 0.45), 0.012, 0.02, 'metal')); continue; } // flat-panel door with a bar pull
     out.push(bx(x, y0, d / 2 - 0.02, dw, dh, 0.02, c), bx(x - dw / 2 + r / 2, y0, z, r, dh, 0.008, c), bx(x + dw / 2 - r / 2, y0, z, r, dh, 0.008, c), bx(x, y0, z, dw - 2 * r, r, 0.008, c), bx(x, y1 - r, z, dw - 2 * r, r, 0.008, c),
       bx(x + (i % 2 ? -1 : 1) * (dw / 2 - r / 2), (y0 + y1) / 2 - 0.06, d / 2 + 0.008, 0.014, 0.12, 0.022, 'metal')); }
   return out; };
-const baseCab = (w, d, h) => [bx(0, 0, -0.04, w, 0.1, d - 0.1, 'dark'), bx(0, 0.1, -0.02, w, h - 0.14, d - 0.04, 'a'), ...cabinetDoors(w, d - 0.02, 0.11, h - 0.05), bx(0, h - 0.04, 0, w, 0.04, d, 'b')];
+const baseCab = (w, d, h, it) => [bx(0, 0, -0.04, w, 0.1, d - 0.1, 'dark'), bx(0, 0.1, -0.02, w, h - 0.14, d - 0.04, 'a'), ...cabinetDoors(w, d - 0.02, 0.11, h - 0.05, 'a+', it?.slab), bx(0, h - 0.04, 0, w, 0.04, d, 'b')];
 const bookshelf = (w, d, h) => {
   const out = [bx(-w / 2 + 0.015, 0, 0, 0.03, h, d, 'a'), bx(w / 2 - 0.015, 0, 0, 0.03, h, d, 'a'), bx(0, 0, -d / 2 + 0.008, w, h, 0.016, 'a-'), bx(0, h - 0.03, 0, w, 0.03, d, 'a')];
   const n = Math.max(1, Math.round(h / 0.38)), sh = (h - 0.03) / n, cols = ['#8c4a3c', '#3f5f7a', '#d9c9a5', '#56715a', '#c98b3f', '#4a4458'];
@@ -61,7 +87,17 @@ const lamp = (w, d, h) => [cy(0, 0, 0, w * 0.6, 0.03, 'b'), cy(0, 0.03, 0, 0.03,
 const appliance = (w, d, h) => [bx(0, 0, -0.01, w, h, d - 0.02, 'a'), bx(0, h * 0.06, d / 2 - 0.012, w - 0.03, h * 0.72, 0.014, 'a+'), bx(0, h * 0.82, d / 2 - 0.012, w - 0.03, h * 0.12, 0.014, 'dark'), bx(0, h * 0.72, d / 2, w * 0.6, 0.02, 0.03, 'metal')];
 const washer = (y, h1) => (w, d) => [bx(0, y, -0.01, w, h1, d - 0.02, 'a'), disc(0, y + h1 * 0.22, d / 2 - 0.01, Math.min(w, h1) * 0.56, 0.03, 'dark'), disc(0, y + h1 * 0.27, d / 2 + 0.005, Math.min(w, h1) * 0.45, 0.03, 'glass'), bx(0, y + h1 - 0.1, d / 2 - 0.012, w - 0.04, 0.07, 0.014, 'a-')];
 
+const IN = 0.0254;
 const DEFS = [
+  // ---------- My picks: real products, sized from the retailer's listing ----------
+  { id: 'asyiah', name: 'Wade Logan Asyiah 114.5" sofa & chaise', cat: 'My picks', w: 114.5 * IN, d: 67 * IN, h: 31 * IN, color: '#5f6b4e', mat: 'fabric', build: sofaChaise,
+    url: 'https://www.wayfair.com/furniture/pdp/wade-logan-asyiah-1145-wide-microfiber-sofa-chaise-w011334397.html?piid=1570405339%2C1586255537',
+    colors: [['Green corduroy', '#5f6b4e']],
+    note: 'Listed size: 114.5" W × 67" D × 31" H; chaise 44" W; seat 18" high; arms 22" high. Right-hand facing chaise (tick Mirror for left).' },
+  { id: 'rebrilliant_l', name: 'Rebrilliant corduroy L-shaped sectional', cat: 'My picks', w: 111 * IN, d: 67 * IN, h: 32 * IN, color: '#cbb89a', mat: 'fabric', build: lSectional,
+    url: 'https://www.wayfair.com/furniture/pdp/rebrilliant-corduroy-l-shaped-sectional-w123144379.html?piid=572712133%2C572712135',
+    colors: [],
+    note: 'Size and colour not yet confirmed from the listing: check the Wayfair page and type the exact width, depth and height above.' },
   // ---------- Living ----------
   { id: 'sofa3', name: 'Sofa, 3-seat', cat: 'Living', w: 2.13, d: 0.92, h: 0.85, color: '#8a9aa3', mat: 'fabric', build: sofa(3) },
   { id: 'sofa2', name: 'Loveseat', cat: 'Living', w: 1.55, d: 0.9, h: 0.85, color: '#8a9aa3', mat: 'fabric', build: sofa(2) },
@@ -100,7 +136,7 @@ const DEFS = [
   // ---------- Kitchen ----------
   { id: 'basecab', name: 'Base cabinet', cat: 'Kitchen', w: 0.6, d: 0.62, h: 0.9, color: '#f2f0ec', color2: '#3b3d42', mat: 'cab', clear: 0.9, build: baseCab },
   { id: 'sinkcab', name: 'Sink cabinet', cat: 'Kitchen', w: 0.9, d: 0.62, h: 0.9, color: '#f2f0ec', color2: '#3b3d42', mat: 'cab', clear: 0.9, build: (w, d, h) => [...baseCab(w, d, h), bx(0, h - 0.035, 0.02, Math.min(w * 0.7, 0.8), 0.04, d * 0.6, 'steel'), bx(0, h - 0.03, 0.02, Math.min(w * 0.7, 0.8) - 0.06, 0.037, d * 0.6 - 0.06, 'dark'), cy(0, h, -d / 2 + 0.08, 0.035, 0.26, 'metal'), bx(0, h + 0.24, -d / 2 + 0.16, 0.03, 0.025, 0.18, 'metal')] },
-  { id: 'wallcab', name: 'Wall cabinet', cat: 'Kitchen', w: 0.6, d: 0.33, h: 0.76, elev: 1.4, color: '#f2f0ec', mat: 'cab', mount: 'wall', build: (w, d, h) => [bx(0, 0, -0.01, w, h, d - 0.02, 'a'), ...cabinetDoors(w, d, 0.01, h - 0.01)] },
+  { id: 'wallcab', name: 'Wall cabinet', cat: 'Kitchen', w: 0.6, d: 0.33, h: 0.76, elev: 1.4, color: '#f2f0ec', mat: 'cab', mount: 'wall', build: (w, d, h, it) => [bx(0, 0, -0.01, w, h, d - 0.02, 'a'), ...cabinetDoors(w, d, 0.01, h - 0.01, 'a+', it?.slab)] },
   { id: 'island', name: 'Kitchen island', cat: 'Kitchen', w: 1.8, d: 0.95, h: 0.92, color: '#4a5a63', color2: '#ece8e1', mat: 'cab', clear: 0.9, build: (w, d, h) => [bx(0, 0, 0, w - 0.1, 0.1, d - 0.25, 'dark'), bx(0, 0.1, -0.08, w - 0.06, h - 0.14, d - 0.3, 'a'), ...cabinetDoors(w - 0.06, d - 0.3, 0.11, h - 0.05).map(p => ({ ...p, z: p.z - 0.08 })), bx(0, h - 0.04, 0, w, 0.04, d, 'b')] },
   { id: 'fridge', name: 'Refrigerator', cat: 'Kitchen', w: 0.9, d: 0.75, h: 1.78, color: '#c9ccd1', clear: 0.9, build: (w, d, h) => [bx(0, 0, -0.03, w, h, d - 0.06, 'a'), bx(-w / 4, 0.62, d / 2 - 0.035, w / 2 - 0.01, h - 0.63, 0.05, 'a+'), bx(w / 4, 0.62, d / 2 - 0.035, w / 2 - 0.01, h - 0.63, 0.05, 'a+'), bx(0, 0.02, d / 2 - 0.035, w - 0.01, 0.58, 0.05, 'a+'), bx(-0.04, 0.9, d / 2, 0.02, 0.5, 0.04, 'metal'), bx(0.04, 0.9, d / 2, 0.02, 0.5, 0.04, 'metal'), bx(0, 0.52, d / 2, w * 0.5, 0.02, 0.04, 'metal')] },
   { id: 'range', name: 'Range / stove', cat: 'Kitchen', w: 0.76, d: 0.66, h: 0.92, color: '#c9ccd1', clear: 0.9, build: (w, d, h) => [bx(0, 0, -0.01, w, h - 0.02, d - 0.02, 'a'), bx(0, h - 0.02, 0, w, 0.02, d, 'black'), bx(0, 0.12, d / 2 - 0.012, w - 0.06, h * 0.6, 0.016, 'dark'), bx(0, h * 0.74, d / 2, w * 0.7, 0.02, 0.035, 'metal'), bx(0, h, -d / 2 + 0.03, w, 0.1, 0.06, 'a'),

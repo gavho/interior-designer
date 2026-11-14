@@ -29,7 +29,18 @@ Touch gestures: tap to select (then drag to move), drag on empty floor to box-se
 **two-finger drag** to pan, **long-press** for the actions menu, and **double-tap** to rename a room, split a wall
 or (in 3D) zoom to a piece. Drawing tools follow your finger and place on lift; tap **✓ Done** to finish.
 In portrait, **☰ Panel** and **Properties** slide the side panels in. Walk mode shows on-screen arrows.
-Projects autosave in Safari; use **File → Save project** to keep a copy in Files.
+Saving on the iPad: work autosaves as you go. **File → Save to My projects** keeps named projects inside the app on
+this device (reopen them from **File → My projects…**). **Save a copy to Files** opens the share sheet so a `.json`
+backup can go to Files, iCloud Drive or AirDrop, and **Open from Files…** loads one back. Add the app to the Home Screen
+so iPadOS keeps its storage.
+
+### My apartment
+
+The app opens with the real unit (2 bed, 980 sq ft, traced from the NEXT Chicago plan): dark walnut vinyl plank floors,
+light greige walls, and the kitchen as built (wood-grain flat-panel cabinets, white quartz, linear glass mosaic backsplash,
+stainless slide-in range, over-the-range microwave, dishwasher and French-door fridge). **File → New from my apartment**
+starts a fresh copy at any time. The **My picks** catalogue category holds the chosen products at their listed sizes, with
+the retailer's colours under **Finish → Retailer colours**.
 
 ## What it does
 

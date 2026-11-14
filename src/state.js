@@ -110,14 +110,44 @@ export async function kvSet(key, val) {
 }
 
 let saveTimer = 0;
+const saveNow = () => { clearTimeout(saveTimer); saveTimer = 0; return kvSet('autosave', { doc: S.doc, assets: S.assets, slot: S.slot }).then(() => emit('saved')).catch(() => {}); };
 function scheduleSave() {
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => kvSet('autosave', { doc: S.doc, assets: S.assets }).then(() => emit('saved')).catch(() => {}), 600);
+  saveTimer = setTimeout(saveNow, 600);
 }
+// iPad: switching apps or closing the tab can freeze the page at any moment, so write pending changes straight away
+addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && saveTimer && S.doc) saveNow(); });
+addEventListener('pagehide', () => { if (saveTimer && S.doc) saveNow(); });
 export const saveLibrary = () => kvSet('library', S.library).catch(() => {});
 export const exportProject = () => JSON.stringify({ ...S.doc, assets: S.assets });
 
+// ---- named projects kept on this device ----
+export const listProjects = async () => (await kvGet('projects').catch(() => null)) || [];
+/** Save the current plan as a named project on this device (overwrites the slot it was opened from). Returns the slot record. */
+export async function saveSlot(name, asNew = false) {
+  const list = await listProjects();
+  let rec = !asNew && S.slot && list.find(p => p.id === S.slot);
+  if (!rec) { rec = { id: uid('pj') }; list.unshift(rec); }
+  Object.assign(rec, { name: name || S.doc.name, saved: Date.now(), items: S.doc.items.length, rooms: S.rooms.length });
+  await kvSet('proj:' + rec.id, { doc: { ...S.doc, name: rec.name }, assets: S.assets });
+  await kvSet('projects', [rec, ...list.filter(p => p !== rec)]);
+  S.slot = rec.id; S.doc.name = rec.name; emit('history'); scheduleSave();
+  return rec;
+}
+export async function openSlot(id) {
+  const data = await kvGet('proj:' + id);
+  if (!data?.doc) throw new Error('missing');
+  setDoc(data.doc, data.assets || {}); S.slot = id;
+  return data.doc;
+}
+export async function deleteSlot(id) {
+  await kvSet('projects', (await listProjects()).filter(p => p.id !== id));
+  const db = await idb(); db.transaction('kv', 'readwrite').objectStore('kv').delete('proj:' + id);
+  if (S.slot === id) S.slot = null;
+}
+
 export async function boot() {
+  try { navigator.storage?.persist?.(); } catch {} // ask the browser not to clear saved projects (Safari evicts unused site data)
   try { Object.assign(S.prefs, JSON.parse(localStorage.getItem('id-prefs') || '{}')); } catch {}
   S.prefs.showClear = false;
   try { S.library = (await kvGet('library')) || []; } catch {}
