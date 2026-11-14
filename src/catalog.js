@@ -60,6 +60,17 @@ const islandCart = (w, d, h, it = {}) => {
   else out.push(bx(0, h - top - (d - bd), zb - bd / 2 - top, w, d - bd, top, 'b')); // leaf hanging down the back
   return out;
 };
+// Low modular "cloud" sectional: corner + armless chair + corner along the back, ottoman in front of the right corner (Mirror moves it left).
+// Module sizes are proportions of the listed overall size: corners 43.3" square, ottoman fills the rest of the depth.
+const modularL = (w, d, h, it = {}) => {
+  const cw = w * (43.31 / 123.62), aw = w - 2 * cw, md = d * (43.31 / 85.82), od = d - md, sh = it.seatH || 0.2, bk = 0.26, z0 = -d / 2, r = 0.07, g = 0.008;
+  const seat = (x, z, mw, mdp) => rb(x, 0, z, mw - g, sh, mdp - g, 'a', r);
+  const out = [seat(-w / 2 + cw / 2, z0 + md / 2, cw, md), seat(0, z0 + md / 2, aw, md), seat(w / 2 - cw / 2, z0 + md / 2, cw, md), seat(w / 2 - cw / 2, z0 + md + od / 2, cw, od)];
+  // backs: along the back of all three seats, plus the outer side of each corner acting as the arm
+  out.push(rb(-w / 2 + cw / 2, sh - 0.02, z0 + bk / 2, cw - g, h - sh + 0.02, bk, 'a+', 0.1), rb(0, sh - 0.02, z0 + bk / 2, aw - g, h - sh + 0.02, bk, 'a+', 0.1), rb(w / 2 - cw / 2, sh - 0.02, z0 + bk / 2, cw - g, h - sh + 0.02, bk, 'a+', 0.1),
+    rb(-w / 2 + bk / 2, sh - 0.02, z0 + bk + (md - bk) / 2, bk, (h - sh) * 0.62, md - bk - g, 'a+', 0.1), rb(w / 2 - bk / 2, sh - 0.02, z0 + bk + (md - bk) / 2, bk, (h - sh) * 0.62, md - bk - g, 'a+', 0.1));
+  return out;
+};
 const table = (w, d, h) => [bx(0, h - 0.04, 0, w, 0.04, d, 'a'), ...legs(w, d, h - 0.04, Math.min(0.06, w * 0.08), 'a-')];
 const roundTable = (w, d, h) => [{ ...cy(0, h - 0.04, 0, w, 0.04, 'a'), d }, cy(0, 0.03, 0, Math.min(0.12, w * 0.15), h - 0.07, 'a-'), { ...cy(0, 0, 0, w * 0.5, 0.03, 'a-'), d: d * 0.5 }];
 const chair = (w, d, h) => { const s = Math.min(0.45, h * 0.5); return [...legs(w, d, s, 0.035, 'b'), bx(0, s, 0, w, 0.06, d, 'a'), bx(0, s + 0.06, -d / 2 + 0.025, w, h - s - 0.06, 0.05, 'a')]; };
@@ -110,6 +121,10 @@ const DEFS = [
     url: 'https://www.wayfair.com/furniture/pdp/rebrilliant-corduroy-l-shaped-sectional-w123144379.html?piid=572712133%2C572712135',
     colors: [],
     note: 'Size and colour not yet confirmed: Wayfair blocks automated reading of this listing. Type the exact width, depth and height from its Specifications tab above.' },
+  { id: 'zone_sectional', name: 'Living Spaces Zone 4-piece modular sectional', cat: 'My picks', w: 123.62 * IN, d: 85.82 * IN, h: 36.22 * IN, color: '#ece4d4', mat: 'fabric', build: modularL,
+    url: 'https://www.livingspaces.com/pdp-zone-cream-4-piece-modular-sectional-with-2-corners-1-armless-chair-ottoman-320081',
+    colors: [['Cream (SKU 320081)', '#ece4d4'], ['Green (SKU 357981)', '#7f8a6a'], ['Blue (SKU 319543)', '#7d91a6']],
+    note: 'Listed size: 123.62" W × 85.82" D × 36.22" H; seat 7.87" high; 18" interior back. Two 43.3" corners + armless chair along the back, ottoman in front of one corner (tick Mirror to move it to the left). Swatch colours are approximate.' },
   { id: 'shintenchi_island', name: 'Shintenchi rolling kitchen island with drop leaf', cat: 'My picks', w: 39.8 * IN, d: 24.8 * IN, h: 35.6 * IN, color: '#f4f3ef', color2: '#f4f3ef', clear: 0.9, build: islandCart,
     url: 'https://www.amazon.com/dp/B0GY8N9MWN',
     colors: [['White', '#f4f3ef'], ['Black', '#2a2a2b']],
