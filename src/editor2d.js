@@ -15,6 +15,10 @@ let drag = null;          // active pointer interaction
 let draft = null;         // wall tool: { from }
 let arc = null;           // arc tool: { a, b }
 let measureFrom = null, calibFrom = null, preview = null, typed = '', guides = [], snapMark = null, spaceDown = false;
+// touch / Apple Pencil: active pointers (for pinch-zoom and two-finger pan), long-press and double-tap
+const touches = new Map();
+let pressStart = { x: 0, y: 0 }, pinch = null, pinchDone = false, fat = 1, pressTimer = 0, lastTap = null, lastTouchAt = 0;
+const TOUCH_TOOLS = new Set(['wall', 'arc', 'door', 'window', 'place', 'measure', 'calibrate']);
 
 const w2s = p => ({ x: (p.x - view.cx) * view.zoom + W / 2, y: (p.y - view.cy) * view.zoom + H / 2 });
 const s2w = p => ({ x: (p.x - W / 2) / view.zoom + view.cx, y: (p.y - H / 2) / view.zoom + view.cy });
@@ -29,7 +33,7 @@ function snap(p, { anchor = null, exclude = null, shift = false, grid = true } =
   guides = []; snapMark = null;
   const verts = [];
   for (const w of S.doc.walls) for (const e of ['a', 'b']) if (!exclude || !exclude(w, e)) verts.push(w[e]);
-  let best = null, bd = px(10);
+  let best = null, bd = px(10 * fat);
   for (const v of verts) { const d = dist(p, v); if (d < bd) { bd = d; best = v; } }
   if (best) { snapMark = { ...best, kind: 'vertex' }; return snapMark; }
   for (const w of S.doc.walls) { // wall midpoints
@@ -85,6 +89,7 @@ function itemHandles(it) {
 const singleItem = () => (S.sel.length === 1 && S.sel[0].k === 'item' ? find('item', S.sel[0].id) : null);
 
 function hitTest(p) {
+  const px = n => n * fat / view.zoom; // bigger targets for fingers
   const d = S.doc, it1 = singleItem();
   if (it1 && !it1.locked) for (const hd of itemHandles(it1)) if (dist(hd.p, p) < px(8)) return { k: 'handle', item: it1, ...hd };
   for (const o of d.openings) {
@@ -403,7 +408,45 @@ function wallEndRefs(points) {
 
 function onDown(e) {
   cv.setPointerCapture(e.pointerId);
-  mouse = evPos(e); const p = s2w(mouse);
+  const touchy = e.pointerType === 'touch' || e.pointerType === 'pen';
+  fat = e.pointerType === 'touch' ? 2.2 : e.pointerType === 'pen' ? 1.4 : 1;
+  if (touchy) {
+    lastTouchAt = performance.now();
+    touches.set(e.pointerId, evPos(e));
+    if (touches.size === 2 && e.pointerType === 'touch') return startPinch();
+    if (touches.size > 1 || pinch) return;
+    pinchDone = false;
+  }
+  mouse = evPos(e);
+  // on a touch screen there is no hover, so drawing tools follow the finger and act when it lifts
+  if (touchy && TOUCH_TOOLS.has(S.tool)) { drag = { t: 'touchtool', start: mouse }; onMove(e); return; }
+  if (touchy && S.tool === 'select') {
+    const at = { x: e.clientX, y: e.clientY };
+    clearTimeout(pressTimer);
+    pressTimer = setTimeout(() => { pressTimer = 0; if (drag?.moved) return; if (drag) { drag = null; revert(); } openContext(at.x, at.y); requestDraw(); }, 550);
+  }
+  toolDown(e);
+  pressStart = mouse;
+}
+
+function startPinch() {
+  clearTimeout(pressTimer); pressTimer = 0;
+  if (drag) { if (drag.moved || drag.t === 'room') revert(); drag = null; }
+  preview = S.tool === 'wall' || S.tool === 'place' ? preview : null; guides = []; snapMark = null;
+  const [a, b] = [...touches.values()], mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+  pinch = { d0: Math.max(1, dist(a, b)), z0: view.zoom, anchor: s2w(mid) };
+  requestDraw();
+}
+
+function pinchMove() {
+  const [a, b] = [...touches.values()], mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+  view.zoom = clamp(pinch.z0 * dist(a, b) / pinch.d0, 6, 1200);
+  view.cx = pinch.anchor.x - (mid.x - W / 2) / view.zoom; view.cy = pinch.anchor.y - (mid.y - H / 2) / view.zoom;
+  emit('view'); requestDraw();
+}
+
+function toolDown(e) {
+  const p = s2w(mouse);
   if (e.button === 1 || (e.button === 0 && (spaceDown || S.tool === 'pan'))) { drag = { t: 'pan', m: mouse, cx: view.cx, cy: view.cy }; cv.style.cursor = 'grabbing'; return; }
   if (e.button !== 0) return;
   const tool = S.tool;
@@ -485,9 +528,15 @@ function placeWallPoint(pt) {
 }
 
 function onMove(e) {
+  if (touches.has(e.pointerId)) {
+    touches.set(e.pointerId, evPos(e));
+    if (pinch) { if (touches.size >= 2) pinchMove(); return; }
+    if (pinchDone) return;
+    if (pressTimer && dist(evPos(e), pressStart) > 10) { clearTimeout(pressTimer); pressTimer = 0; }
+  }
   mouse = evPos(e); const p = s2w(mouse); cursor = p;
   emit('cursor', p);
-  if (drag) return onDrag(e, p);
+  if (drag && drag.t !== 'touchtool') return onDrag(e, p);
   guides = []; snapMark = null;
   const tool = S.tool;
   if (tool === 'select') {
@@ -599,8 +648,24 @@ export function beginMove(e) {
 export function itemAnchor(it) { const s = w2s(it); return { x: s.x, y: s.y - (Math.hypot(it.w, it.d) / 2) * view.zoom, w: W, h: H }; }
 
 function onUp(e) {
+  clearTimeout(pressTimer); pressTimer = 0;
+  if (touches.has(e.pointerId)) {
+    touches.delete(e.pointerId);
+    if (pinch) { if (touches.size < 2) { pinch = null; pinchDone = true; } return; }
+    if (pinchDone) { if (!touches.size) pinchDone = false; return; }
+    if (e.type === 'pointercancel') { if (drag?.moved) revert(); drag = null; requestDraw(); return; }
+    // double-tap = double-click
+    const now = performance.now(), m = evPos(e), moved = drag?.moved;
+    if (!moved && lastTap && now - lastTap.t < 320 && dist(m, lastTap.m) < 30) { lastTap = null; onUp2(e); onDblClick(e); return; }
+    lastTap = moved ? null : { t: now, m };
+  }
+  onUp2(e);
+}
+
+function onUp2(e) {
   const d = drag; drag = null;
   if (!d) return;
+  if (d.t === 'touchtool') { mouse = evPos(e); toolDown(e); return; }
   if (d.t === 'pan') { cv.style.cursor = ''; return; }
   if (d.t === 'marquee') {
     const b = d.b;
@@ -628,6 +693,7 @@ function onWheel(e) {
 }
 
 function onDblClick(e) {
+  if (e.type === 'dblclick' && performance.now() - lastTouchAt < 800) return; // already handled as a double-tap
   const p = s2w(evPos(e));
   if (S.tool === 'wall') { draft = null; preview = null; typed = ''; requestDraw(); return; }
   if (S.tool !== 'select') return;
@@ -656,6 +722,17 @@ export function handleKey(e) {
   return false;
 }
 
+function openContext(clientX, clientY) {
+  const r = cv.getBoundingClientRect(), p = s2w({ x: clientX - r.left, y: clientY - r.top }), hit = hitTest(p);
+  if (hit && hit.k !== 'handle' && hit.k !== 'vertex' && !isSel(hit.k, hit.id)) select([hit]);
+  else if (!hit) select([]);
+  emit('contextmenu', { x: clientX, y: clientY, world: p, hit });
+}
+
+/** Finish the wall / curve / measurement being drawn (the touch equivalent of Esc or double-click). */
+export function finishDrawing() { draft = null; measureFrom = null; calibFrom = null; arc = null; preview = null; typed = ''; requestDraw(); }
+export const isDrawing = () => !!(draft || measureFrom || calibFrom || arc);
+
 export function initEditor(canvas) {
   cv = canvas; ctx = cv.getContext('2d');
   new ResizeObserver(resize).observe(cv.parentElement);
@@ -665,14 +742,13 @@ export function initEditor(canvas) {
   cv.addEventListener('pointerleave', () => { if (!drag) { preview = S.tool === 'wall' ? preview : null; hover = null; requestDraw(); } });
   cv.addEventListener('wheel', onWheel, { passive: false });
   cv.addEventListener('dblclick', onDblClick);
+  cv.addEventListener('pointercancel', onUp);
   cv.addEventListener('contextmenu', e => {
     e.preventDefault();
+    if (performance.now() - lastTouchAt < 800) return; // touch uses long-press instead
     if (S.tool === 'wall' && draft) { draft = null; preview = null; typed = ''; requestDraw(); return; }
     if (S.tool !== 'select') { setTool('select'); return; }
-    const p = s2w(evPos(e)), hit = hitTest(p);
-    if (hit && hit.k !== 'handle' && hit.k !== 'vertex' && !isSel(hit.k, hit.id)) select([hit]);
-    else if (!hit) select([]);
-    emit('contextmenu', { x: e.clientX, y: e.clientY, world: p, hit });
+    openContext(e.clientX, e.clientY);
   });
   on('doc', requestDraw); on('sel', requestDraw); on('prefs', requestDraw);
   on('tool', () => {

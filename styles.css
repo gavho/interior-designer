@@ -5,9 +5,11 @@
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); }
+html { touch-action: pan-x pan-y; -webkit-text-size-adjust: 100%; } /* no page pinch-zoom: pinch zooms the plan instead */
+body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
 button, input, select { font: inherit; color: inherit; }
 button { cursor: pointer; border: 1px solid var(--line); background: #fff; border-radius: var(--radius); padding: 5px 10px; }
-button:hover:not(:disabled) { background: #f4f6f9; border-color: #cfd4dc; }
+@media (hover: hover) { button:hover:not(:disabled) { background: #f4f6f9; border-color: #cfd4dc; } }
 button:disabled { opacity: .4; cursor: default; }
 button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 button.primary:hover:not(:disabled) { background: #2468d6; border-color: #2468d6; }
@@ -20,7 +22,8 @@ kbd { font: 11px ui-monospace, Consolas, monospace; background: #eef0f3; border:
 .grow { flex: 1; }
 .hint { color: var(--muted); font-size: 12px; margin: 6px 0; }
 
-#app { display: grid; height: 100%; grid-template: 46px minmax(0, 1fr) 26px / 48px 296px minmax(0, 1fr) 284px;
+#app { display: grid; height: 100%; position: relative;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); grid-template: 46px minmax(0, 1fr) 26px / 48px 296px minmax(0, 1fr) 284px;
   grid-template-areas: "top top top top" "rail left stage right" "status status status status"; }
 
 /* ---- top bar ---- */
@@ -172,8 +175,9 @@ kbd { font: 11px ui-monospace, Consolas, monospace; background: #eef0f3; border:
 }
 @media (max-width: 1100px) {
   #app { grid-template-columns: 48px 250px minmax(0, 1fr) 240px; }
-  #topbar .toggle { display: none; }
 }
+.optmenu { display: none; }
+@media (max-width: 1366px) { #topbar .toggle { display: none; } #topbar .optmenu { display: inline-block; } }
 
 /* ---- selection toolbar, presets, model library ---- */
 .selbar { position: absolute; z-index: 5; transform: translateX(-50%); align-items: center; gap: 2px; padding: 3px; background: #fff; border: 1px solid var(--line); border-radius: 9px; box-shadow: 0 4px 14px rgba(20, 30, 50, .18); white-space: nowrap; }
@@ -191,3 +195,52 @@ kbd { font: 11px ui-monospace, Consolas, monospace; background: #eef0f3; border:
 .renderbar { background: #1f242c; color: #fff; border-color: #1f242c; padding: 4px 6px 4px 10px; }
 .renderbar span { color: #c9d0da; padding: 0; }
 .renderbar b { margin: 0 3px; font-variant-numeric: tabular-nums; }
+
+/* ---- touch screens and iPad ---- */
+#topbar .drawer-btn { display: none; }
+.donebar { display: none; }
+.walkpad { position: absolute; right: 0; bottom: 0; display: flex; gap: 8px; align-items: flex-end; pointer-events: none; }
+#hud3d .walkpad { position: fixed; right: calc(14px + env(safe-area-inset-right)); bottom: calc(40px + env(safe-area-inset-bottom)); }
+.walkpad button { min-width: 52px; min-height: 52px; font-size: 20px; touch-action: none; user-select: none; -webkit-user-select: none; }
+.walkcol { display: flex; flex-direction: column; gap: 4px; }
+
+@media (pointer: coarse) {
+  :root { font-size: 14px; }
+  button { padding: 8px 12px; }
+  #topbar button, #topbar select { padding: 8px 10px; }
+  #rail button { width: 42px; height: 42px; }
+  #rail { gap: 6px; }
+  .tabs button { padding: 13px 0; font-size: 13px; }
+  .hudgroup button { padding: 8px 13px; min-height: 38px; }
+  .selbar button { padding: 9px 12px; font-size: 16px; }
+  .menu button { padding: 11px 12px; }
+  input[type=text], input[type=number], input[type=url], input[type=search], select { padding: 7px 8px; font-size: 15px; }
+  input[type=color] { width: 40px; height: 34px; }
+  .presets button { width: 28px; height: 28px; }
+  #app { grid-template-rows: 52px minmax(0, 1fr) 28px; }
+  * { -webkit-touch-callout: none; }
+  input, textarea { -webkit-touch-callout: default; }
+}
+
+/* iPad landscape: the properties panel slides out so the plan keeps its room */
+@media (pointer: coarse) and (max-width: 1366px) {
+  #app { grid-template-columns: 52px 290px minmax(0, 1fr) 0; }
+  #topbar .drawer-btn.dr { display: inline-block; }
+  .brandname, .saved { display: none; }
+  #right { position: absolute; z-index: 20; top: 0; bottom: 0; width: min(330px, 80vw);
+    right: 0; transform: translateX(calc(100% + 10px)); box-shadow: 0 10px 40px rgba(20, 30, 50, .25); transition: transform .2s ease, visibility .2s; visibility: hidden; }
+  #app.drawerright #right { transform: none; visibility: visible; }
+}
+/* iPad portrait and other narrow screens: both side panels slide over the plan */
+@media (max-width: 1000px) {
+  #app { grid-template-columns: 52px 0 minmax(0, 1fr) 0; }
+  #topbar .drawer-btn { display: inline-block; }
+  .brandname, .saved, #topbar .docname { display: none; }
+  #left, #right { position: absolute; z-index: 20; top: 0; bottom: 0; width: min(330px, 80vw); /* placed within their (zero-width) grid areas */
+    box-shadow: 0 10px 40px rgba(20, 30, 50, .25); transition: transform .2s ease; }
+  #left { left: 0; transform: translateX(calc(-100% - 60px)); visibility: hidden; transition: transform .2s ease, visibility .2s; }
+  #right { right: 0; transform: translateX(calc(100% + 10px)); }
+  #app.drawerleft #left, #app.drawerright #right { transform: none; visibility: visible; }
+  #app[data-view="split"] #stage { flex-direction: column; }
+  #app[data-view="split"] #pane3d { border-left: 0; border-top: 1px solid var(--line); }
+}

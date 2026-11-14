@@ -80,12 +80,14 @@ function buildTopbar() {
   const unit = selectInput([['imperial', 'ft / in'], ['metric', 'Metric']], S.doc.units, v => { S.doc.units = v; S.doc.settings.snap = v === 'imperial' ? 0.0254 : 0.01; commit(); });
   const saved = h('span.saved', null, '');
   $('topbar').replaceChildren(
-    h('div.brand', null, h('span.logo', null, '⌂'), 'Interior Designer'),
+    h('div.brand', null, h('span.logo', null, '⌂'), h('span.brandname', null, 'Interior Designer')),
+    h('button.drawer-btn.dl', { title: 'Show the catalogue and tools panel', onclick: () => toggleDrawer('left') }, '☰ Panel'),
     h('button.menu-btn', { onclick: e => fileMenu(e.currentTarget) }, 'File ▾'), name, saved,
     h('div.sep'), undoB, redoB, h('div.sep'),
     tog('snapGrid', 'Grid snap', 'Snap to the measurement grid (G)'), tog('snapAngle', 'Angle snap', 'Snap walls to 15° steps'), tog('magnet', 'Wall magnet', 'Furniture snaps flush to walls'),
     tog('showDims', 'Dimensions', 'Show wall lengths'), tog('showLabels', 'Labels', 'Show room names and areas'),
-    h('div.grow'), unit, viewSeg, h('button.menu-btn', { onclick: helpDialog, title: 'Keyboard shortcuts (?)' }, '?'));
+    h('button.menu-btn.optmenu', { onclick: e => { const r = e.currentTarget.getBoundingClientRect(); menu(r.left, r.bottom + 4, [...document.querySelectorAll('#topbar .toggle')].map(b => ({ label: (S.prefs[b.dataset.pref] ? '✓ ' : '\u2003 ') + b.textContent, run: () => setPref(b.dataset.pref, !S.prefs[b.dataset.pref]) }))); } }, 'Options ▾'),
+    h('div.grow'), h('button.drawer-btn.dr', { title: 'Show the properties panel', onclick: () => toggleDrawer('right') }, 'Properties'), unit, viewSeg, h('button.menu-btn', { onclick: helpDialog, title: 'Keyboard shortcuts (?)' }, '?'));
   const sync = () => {
     undoB.disabled = !canUndo(); redoB.disabled = !canRedo();
     document.querySelectorAll('#topbar .toggle').forEach(b => b.classList.toggle('on', !!S.prefs[b.dataset.pref]));
@@ -97,6 +99,16 @@ function buildTopbar() {
   on('saved', () => { saved.textContent = 'Saved'; clearTimeout(saved._t); saved._t = setTimeout(() => (saved.textContent = ''), 1500); });
   sync();
 }
+
+/** On narrow screens (iPad portrait) the side panels slide over the plan instead of taking room from it. */
+export function toggleDrawer(side, open) {
+  const app = $('app'), key = 'drawer' + side;
+  const v = open ?? !app.classList.contains(key);
+  app.classList.remove('drawerleft', 'drawerright');
+  app.classList.toggle(key, v);
+}
+const narrow = () => matchMedia('(max-width: 1000px)').matches;
+export const isTouch = matchMedia('(pointer: coarse)').matches;
 
 export function setView(v) { $('app').dataset.view = v; setPref('view', v); }
 
@@ -146,7 +158,10 @@ function helpDialog() {
   const keys = [['V', 'Select / move'], ['W', 'Draw walls'], ['A', 'Curved wall (start, end, then bend)'], ['R', 'Rectangle room'], ['D', 'Door'], ['N', 'Window'], ['M', 'Measure / dimension'], ['T', 'Text label'], ['H or Space-drag', 'Pan'], ['Scroll', 'Zoom'], ['F', 'Zoom to fit'],
     ['Q / E', 'Rotate selection 90° (Shift: 15°)'], ['Arrows', 'Nudge (Shift: larger)'], ['Ctrl+D', 'Duplicate'], ['Ctrl+C / V', 'Copy / paste'], ['Del', 'Delete'], ['Ctrl+Z / Y', 'Undo / redo'], ['Ctrl+A', 'Select all furniture'],
     ['G', 'Toggle grid snap'], ['1 / 2 / 3', '2D / split / 3D view'], ['Esc', 'Cancel / deselect'], ['Double-click wall', 'Split wall'], ['Double-click in 3D', 'Zoom in on a piece'], ['Double-click room', 'Rename room'], ['Shift while drawing', 'Lock to 45° steps'], ['Alt while dragging', 'Ignore snapping']];
-  dialog('Shortcuts & tips', h('div', null, h('div.keys', null, keys.map(([k, d]) => [h('kbd', null, k), h('span', null, d)])),
+  const gestures = [['Tap', 'Select (tap again and drag to move)'], ['Drag on empty floor', 'Box-select'], ['Pinch', 'Zoom'], ['Two-finger drag', 'Pan the plan'], ['Long-press', 'Actions menu (split wall, add door, lock…)'],
+    ['Double-tap', 'Rename room / split wall / zoom to a piece in 3D'], ['Drawing tools', 'Touch, slide to aim, lift to place; tap ✓ Done to finish'], ['☰ Panel / Properties', 'Open the side panels on a narrow screen']];
+  dialog('Shortcuts & tips', h('div', null, isTouch && h('h3', null, 'Touch'), isTouch && h('div.keys', null, gestures.map(([k, d]) => [h('kbd', null, k), h('span', null, d)])),
+    isTouch && h('h3', null, 'Keyboard'), h('div.keys', null, keys.map(([k, d]) => [h('kbd', null, k), h('span', null, d)])),
     h('p.hint', null, 'While drawing a wall, type a length such as 12\'6" or 3.8m and press Enter to place it exactly. Click a piece to select it; a toolbar appears above it with Move, rotate, centre, duplicate and delete. Drag the Move grip (or the piece itself once selected) to move it. In 3D, switch to Walk and use W A S D, or press Photo render for a path-traced image.')));
 }
 
@@ -455,7 +470,7 @@ function projectProps() {
       h('li', null, h('b', null, 'Openings'), ' — add doors (D) and windows (N) by clicking on walls.'),
       h('li', null, h('b', null, 'Furnish'), ' — pick pieces from the catalogue, resize them here, or add your own from a product link or 3D model.'),
       h('li', null, h('b', null, 'Check'), ' — the Insights tab flags collisions, blocked doors and tight walkways.'))),
-    h('p.hint', null, 'Select anything on the plan to edit it here. Right-click for more actions.'),
+    h('p.hint', null, isTouch ? 'Select anything on the plan to edit it here. Long-press for more actions.' : 'Select anything on the plan to edit it here. Right-click for more actions.'),
   ];
 }
 
@@ -488,7 +503,11 @@ function buildRight() {
 
 // ------------------------------------------------------------------ HUDs, status bar, context menu
 function build2dHud() {
-  $('hud2d').replaceChildren(h('div.hudgroup', null, btn('−', () => ed.zoomBy(1 / 1.25), { title: 'Zoom out' }), btn('Fit', ed.zoomFit, { title: 'Zoom to fit (F)' }), btn('+', () => ed.zoomBy(1.25), { title: 'Zoom in' })));
+  const done = h('div.hudgroup.donebar', null, btn('✓ Done', () => { ed.finishDrawing(); setTool('select'); }, { cls: 'primary', title: 'Finish drawing and go back to Select (Esc)' }));
+  $('hud2d').replaceChildren(h('div.hudgroup', null, btn('−', () => ed.zoomBy(1 / 1.25), { title: 'Zoom out' }), btn('Fit', ed.zoomFit, { title: 'Zoom to fit (F)' }), btn('+', () => ed.zoomBy(1.25), { title: 'Zoom in' })), done);
+  const sync = () => (done.style.display = S.tool === 'select' ? 'none' : 'flex');
+  on('tool', () => { sync(); if (narrow() && S.tool !== 'select') toggleDrawer('left', false); }); // close the catalogue so the plan can be tapped
+  sync();
 }
 function build3dHud() {
   if (!api3d) { $('hud3d').replaceChildren(h('div.hudmsg', null, 'Loading 3D…')); return; }
@@ -497,7 +516,15 @@ function build3dHud() {
   let tick = 0;
   on('render', () => { const a = api3d.renderInfo().active; renderBar.style.display = a ? 'flex' : 'none'; clearInterval(tick); if (a) tick = setInterval(() => (samples.textContent = api3d.renderInfo().samples), 400); });
   const walkB = btn('Walk', () => api3d.setWalk(!S.walk), { title: 'First-person walkthrough: W A S D to move, drag to look, Esc to leave' });
-  on('walk', () => { walkB.classList.toggle('on', S.walk); S.walk && toast('Walk mode — W A S D to move, drag to look around, Esc to exit', 4000); });
+  const hold = (label, code, title) => h('button', { title, onpointerdown: e => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); api3d.setWalkKey(code, true); },
+    onpointerup: () => api3d.setWalkKey(code, false), onpointercancel: () => api3d.setWalkKey(code, false), oncontextmenu: e => e.preventDefault() }, label);
+  const pad = h('div.walkpad', { style: { display: 'none' } },
+    h('div.hudgroup', null, hold('◀', 'KeyA', 'Step left'), h('div.walkcol', null, hold('▲', 'KeyW', 'Forward'), hold('▼', 'KeyS', 'Back')), hold('▶', 'KeyD', 'Step right')),
+    h('div.hudgroup', null, hold('⟲', 'ArrowLeft', 'Turn left'), hold('⟳', 'ArrowRight', 'Turn right'), btn('Exit', () => api3d.setWalk(false))));
+  on('walk', () => {
+    walkB.classList.toggle('on', S.walk); pad.style.display = S.walk ? 'flex' : 'none';
+    S.walk && toast(isTouch ? 'Walk mode — use the arrows to move, drag to look around' : 'Walk mode — W A S D to move, drag to look around, Esc to exit', 4000);
+  });
   $('hud3d').replaceChildren(
     h('div.hudgroup', null, btn('Orbit', () => api3d.setCamera('iso'), { title: 'Reset to an overview' }), btn('Top', () => api3d.setCamera('top')), btn('Front', () => api3d.setCamera('front')), walkB),
     h('div.hudgroup', null, h('span', null, 'Walls'), selectInput([['auto', 'Cut-away'], ['full', 'All'], ['none', 'Hidden']], 'auto', v => api3d.setWallMode(v)),
@@ -505,13 +532,13 @@ function build3dHud() {
       check('Shadows', true, v => api3d.setShadows(v))),
     h('div.hudgroup', null, h('span', null, 'Quality'), selectInput([['standard', 'Standard'], ['high', 'High (ambient occlusion)']], 'standard', v => api3d.setQuality(v)),
       btn('📷 Photo render', () => { toast('Preparing the render…'); api3d.startRender().catch(() => toast('The photo renderer could not start on this device')); }, { cls: 'primary', title: 'Path-traced render of this view: real light bounces, soft shadows and reflections' })),
-    renderBar);
+    renderBar, pad);
 }
 
 function buildStatus() {
   const hint = h('span.hint'), pos = h('span'), zoom = h('span'), area = h('span');
   $('status').replaceChildren(hint, h('div.grow'), area, pos, zoom);
-  on('status', t => (hint.textContent = t || 'Right-click for actions · Scroll to zoom · Space-drag to pan'));
+  on('status', t => (hint.textContent = t || (isTouch ? 'Long-press for actions · Pinch to zoom · Two fingers to pan · Double-tap a room to rename' : 'Right-click for actions · Scroll to zoom · Space-drag to pan')));
   on('cursor', p => (pos.textContent = `X ${L(p.x)}   Y ${L(p.y)}`));
   const z = () => (zoom.textContent = `${Math.round(ed.view.zoom)} px/m`);
   on('view', z); z();

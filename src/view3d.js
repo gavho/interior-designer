@@ -21,6 +21,8 @@ let wallMode = 'auto', structSig = '', wallObjs = [], needFit = true;
 let quality = 'standard', composer = null, pt = null, ptActive = false, ptEnv = null, ptSaved = null;
 const itemObjs = new Map();
 const walk = { yaw: 0, pitch: 0, keys: {}, last: 0 };
+/** On-screen walk controls (touch): hold a movement key down or let it go. */
+export function setWalkKey(code, down) { walk.keys[code] = down; }
 
 // ---- shared geometry / materials ----
 const BOX = new THREE.BoxGeometry(1, 1, 1), SPH = new THREE.SphereGeometry(0.5, 24, 16);
@@ -475,12 +477,22 @@ export function init3d(el) {
       touch();
     }
   });
+  let tap3 = null, touchAt = 0;
   cvs.addEventListener('pointerup', e => {
+    if (e.pointerType === 'touch') { // double-tap = double-click
+      const now = performance.now(); touchAt = now;
+      if ((act?.t === 'click' || (act?.t === 'drag' && !act.moved)) && Math.hypot(e.clientX - act.x, e.clientY - act.y) < 10) {
+        if (tap3 && now - tap3.t < 320 && Math.hypot(e.clientX - tap3.x, e.clientY - tap3.y) < 30) { tap3 = null; act = null; controls.enabled = !S.walk; flyTo(e); return; }
+        tap3 = { t: now, x: e.clientX, y: e.clientY };
+      } else tap3 = null;
+    }
     if (act?.t === 'drag') { controls.enabled = !S.walk; if (act.moved) commit(); }
     else if (act?.t === 'click' && !act.it && Math.hypot(e.clientX - act.x, e.clientY - act.y) < 4) select([]);
     act = null;
   });
-  cvs.addEventListener('dblclick', e => { // zoom in on a piece
+  cvs.addEventListener('pointercancel', () => { if (act?.t === 'drag') { controls.enabled = !S.walk; if (act.moved) commit(); } act = null; });
+  cvs.addEventListener('dblclick', e => { if (performance.now() - touchAt > 800) flyTo(e); });
+  function flyTo(e) { // zoom in on a piece
     if (S.walk || ptActive) return;
     cast(e);
     let o = ray.intersectObjects(itemsGroup.children, true)[0]?.object; while (o && !o.userData.itemId) o = o.parent;
@@ -488,7 +500,7 @@ export function init3d(el) {
     const c = new THREE.Vector3(it.x, (it.elev || 0) + it.h / 2, it.y), dir = camera.position.clone().sub(controls.target).normalize();
     if (dir.y < 0.3) dir.setY(0.3).normalize();
     controls.target.copy(c); camera.position.copy(c).addScaledVector(dir, Math.max(0.25, Math.hypot(it.w, it.d, it.h) * 1.5)); controls.update();
-  });
+  }
   const key = e => { if (!S.walk) return; if (/^(Key[WASD]|Arrow|Shift)/.test(e.code)) { walk.keys[e.code] = e.type === 'keydown'; e.preventDefault(); } };
   window.addEventListener('keydown', key); window.addEventListener('keyup', key);
 
