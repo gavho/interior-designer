@@ -95,6 +95,19 @@ const flutedStand = (w, d, h) => {
   out.push(bx(-w / 2 + 0.04, h - 0.062, -d / 2 + 0.06, 0.07, 0.004, 0.07, 'dark')); // charging pad
   return out;
 };
+// Fluted dresser: rounded top and sides, cols × rows fluted drawers with gold bar pulls along their top edge, 3.94" plinth.
+const flutedDresser = (cols, rows) => (w, d, h) => {
+  const pl = 0.1, t = 0.03, cw = (w - 2 * t - 0.01) / cols, rh = (h - pl - 0.06) / rows, out = [bx(0, 0, -0.01, w - 2 * t, pl, d - 0.04, 'a-'),
+    rb(-w / 2 + t / 2, 0, 0, t, h - 0.04, d, 'a', 0.012), rb(w / 2 - t / 2, 0, 0, t, h - 0.04, d, 'a', 0.012), rb(0, h - 0.06, 0, w, 0.06, d, 'a', 0.03),
+    bx(0, pl, -0.01, w - 2 * t, h - pl - 0.06, d - 0.04, 'a-')];
+  for (let c = 0; c < cols; c++) for (let r = 0; r < rows; r++) {
+    const x = -w / 2 + t + 0.005 + cw * (c + 0.5), y = pl + r * rh + 0.003, n = Math.max(4, Math.round((cw - 0.02) / 0.02)), fw = (cw - 0.02) / n;
+    out.push(bx(x, y, d / 2 - 0.022, cw - 0.008, rh - 0.006, 0.02, 'a-'));
+    for (let i = 0; i < n; i++) out.push(cy(x - (cw - 0.02) / 2 + fw * (i + 0.5), y + 0.004, d / 2 - 0.006, fw * 0.95, rh - 0.014, 'a'));
+    out.push(bx(x, y + rh - 0.035, d / 2 + 0.01, Math.min(0.14, cw * 0.3), 0.012, 0.016, '#c9a54a'));
+  }
+  return out;
+};
 // Desk with a two-tone top (wood ends, black centre panel) on black U-frame legs.
 const uFrameDesk = (w, d, h) => {
   const tt = 0.025, lg = 0.05, top = h - tt, out = [bx(-w / 2 + w / 8, top, 0, w / 4, tt, d, 'a'), bx(w / 2 - w / 8, top, 0, w / 4, tt, d, 'a'), bx(0, top, 0, w / 2, tt, d, '#1d1d1f')];
@@ -174,6 +187,9 @@ const DEFS = [
     url: 'https://a.co/d/0i5KghFd',
     colors: [['Oak', '#d2b07a']],
     note: 'Listed size: 19.6" W × 15.5" D × 24" H (sold as a set of 2: place one each side of the bed). Open shelf, two fluted drawers, charging station.' },
+  { id: 'decofy_dresser', name: 'Decofy 47" fluted 6-drawer dresser', cat: 'My picks', w: 47.2 * IN, d: 15.8 * IN, h: 31.5 * IN, color: '#d2b07a', build: flutedDresser(2, 3),
+    colors: [['Natural oak', '#d2b07a']],
+    note: 'Listed size: 47.2" W × 15.8" D × 31.5" H (diagram: 31.6"); six fluted drawers in two columns with gold handles, 3.94" plinth. Drawers 21.8" × 13.8" × 5.8" inside. Matches the Decofy fluted nightstand.' },
   { id: 'tribesigns_desk', name: 'Tribesigns 63" computer desk', cat: 'My picks', w: 63 * IN, d: 31.5 * IN, h: 29.53 * IN, color: '#7a4e2d', color2: '#1b1b1d', build: uFrameDesk,
     colors: [['Rustic brown / black', '#7a4e2d']],
     note: 'Listed size: 63" × 31.5" × 29.53" H; two-tone top (15.75" wood ends, 31.5" black centre), 1.97" square black metal legs.' },
