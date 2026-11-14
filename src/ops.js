@@ -92,6 +92,11 @@ export function deleteSelection() {
   d.openings = d.openings.filter(o => !op.has(o.id) && !w.has(o.wallId));
   d.labels = d.labels.filter(o => !lb.has(o.id));
   d.dims = d.dims.filter(o => !dm.has(o.id));
+  if (d.elec) { // electrical points and cables; a cable goes with either of its ends
+    const ep = ids('elec'), cb = ids('cable'), gone = e => (e?.point && ep.has(e.point)) || (e?.item && it.has(e.item) && !d.items.some(i => i.id === e.item));
+    d.elec.points = d.elec.points.filter(o => !ep.has(o.id));
+    d.elec.cables = d.elec.cables.filter(c => !cb.has(c.id) && !gone(c.from) && !gone(c.to));
+  }
   select([]); commit();
 }
 

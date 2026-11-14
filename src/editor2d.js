@@ -5,6 +5,7 @@ import { getDef, drawSymbol } from './catalog.js';
 import { getFloor, floorCanvas, TEX } from './materials.js';
 import { addWall, addOpening, wallMagnet, splitWall, itemGaps, arcPoints, addPolyWalls, sits, surfaceUnder, riders } from './ops.js';
 import { analyze, clearanceMap } from './analysis.js';
+import { POINT_KINDS, CABLE_KINDS, elec, cableLength, wallFace, fmtFt } from './electrical.js';
 
 const ACCENT = '#2f7df6', WALL = '#3a3f47';
 let cv, ctx, W = 100, H = 100, dpr = 1, raf = 0, exporting = false;
@@ -18,7 +19,8 @@ let measureFrom = null, calibFrom = null, preview = null, typed = '', guides = [
 // touch / Apple Pencil: active pointers (for pinch-zoom and two-finger pan), long-press and double-tap
 const touches = new Map();
 let pressStart = { x: 0, y: 0 }, pinch = null, pinchDone = false, fat = 1, pressTimer = 0, lastTap = null, lastTouchAt = 0;
-const TOUCH_TOOLS = new Set(['wall', 'arc', 'door', 'window', 'place', 'measure', 'calibrate']);
+const TOUCH_TOOLS = new Set(['wall', 'arc', 'door', 'window', 'place', 'measure', 'calibrate', 'outlet', 'cable']);
+let cableDraft = null; // cable tool: { kind, from, path }
 
 const w2s = p => ({ x: (p.x - view.cx) * view.zoom + W / 2, y: (p.y - view.cy) * view.zoom + H / 2 });
 const s2w = p => ({ x: (p.x - W / 2) / view.zoom + view.cx, y: (p.y - H / 2) / view.zoom + view.cy });
@@ -92,6 +94,9 @@ function hitTest(p) {
   const px = n => n * fat / view.zoom; // bigger targets for fingers
   const d = S.doc, it1 = singleItem();
   if (it1 && !it1.locked) for (const hd of itemHandles(it1)) if (dist(hd.p, p) < px(8)) return { k: 'handle', item: it1, ...hd };
+  const showE = S.prefs.showElec !== false && d.elec;
+  if (showE) for (const q of d.elec.points) if (dist(q, p) < px(9)) return { k: 'elec', id: q.id };
+  if (showE) for (const c of d.elec.cables) { const L = cableLength(c); if (L) for (let i = 1; i < L.pts.length; i++) if (projectOnSegment(p, L.pts[i - 1], L.pts[i]).dist < px(5)) return { k: 'cable', id: c.id }; }
   for (const o of d.openings) {
     const w = find('wall', o.wallId), g = w && S.wallGeom.get(w.id); if (!g) continue;
     const v = sub(p, w.a), al = dot(v, g.dir), pe = dot(v, g.n);
@@ -346,6 +351,7 @@ function draw() {
   drawRoomLabels();
   for (const m of d.dims) dimension(m.a, m.b, 0, isSel('dim', m.id) ? ACCENT : '#d0652a');
   for (const l of d.labels) text(l, l.text, { size: Math.max(7, l.size * z), bold: true, color: isSel('label', l.id) ? ACCENT : l.color || '#22262b' });
+  if (S.prefs.showElec !== false || ['outlet', 'cable'].includes(S.tool)) drawElec();
   if (!exporting) drawOverlays();
 }
 
@@ -459,6 +465,10 @@ function toolDown(e) {
     } else if (hit?.k === 'vertex') {
       const refs = wallEndRefs([hit.p]);
       drag = { t: 'vertex', refs, anchor: refs.length ? { ...refs[0].w[refs[0].e === 'a' ? 'b' : 'a'] } : null };
+    } else if (hit?.k === 'elec') {
+      select([hit]); const q = find('elec', hit.id); if (!q.locked) drag = { t: 'elec', q, start: p };
+    } else if (hit?.k === 'cable') {
+      select([hit]);
     } else if (hit && hit.k !== 'room') {
       const was = isSel(hit.k, hit.id), w0 = hit.k === 'wall' && find('wall', hit.id);
       if (e.shiftKey) toggleSel(hit);
@@ -501,6 +511,14 @@ function toolDown(e) {
     const t = prompt('Label text:');
     if (t) { const l = { id: uid('lb'), x: p.x, y: p.y, text: t, size: 0.22 }; S.doc.labels.push(l); select([{ k: 'label', id: l.id }]); commit(); }
     setTool('select');
+  } else if (tool === 'outlet') {
+    const q = outletAt(p, e);
+    if (q) { elec().points.push(q); commit(); select([{ k: 'elec', id: q.id }]); }
+  } else if (tool === 'cable') {
+    const end = endAt(p);
+    if (!cableDraft) cableDraft = { kind: S.toolOpt.kind || 'power', from: end || { x: p.x, y: p.y }, path: [] };
+    else if (end) finishCable(end);
+    else cableDraft.path.push({ x: p.x, y: p.y });
   } else if (tool === 'calibrate') {
     if (!calibFrom) calibFrom = p;
     else {
@@ -516,6 +534,68 @@ function toolDown(e) {
     }
   }
   requestDraw();
+}
+
+// ---- electrical: outlets / jacks / switches and cable runs ----
+function outletAt(p, e) {
+  const kind = S.toolOpt.kind || 'outlet', k = POINT_KINDS[kind] || POINT_KINDS.outlet, g = S.doc.settings.snap;
+  const base = { id: uid('ep'), kind, z: k.z, label: '' };
+  if (k.wall) { const f = wallFace(p, 0.8); return f ? { ...base, x: f.x, y: f.y, rot: f.rot, wallId: f.wallId } : null; }
+  const it = kind === 'strip' ? S.doc.items.filter(i => !getDef(i.type).flat && inItem(p, i, 0)).sort((a, b) => b.elev + b.h - a.elev - a.h)[0] : null; // a strip can sit on a desk
+  return { ...base, x: S.prefs.snapGrid && !e?.altKey ? Math.round(p.x / g) * g : p.x, y: S.prefs.snapGrid && !e?.altKey ? Math.round(p.y / g) * g : p.y, rot: 0, z: it ? it.elev + it.h + 0.02 : k.z };
+}
+/** What a cable end would attach to under the cursor: an electrical point, or a piece of furniture. */
+function endAt(p) {
+  const q = elec().points.find(q => dist(q, p) < px(12 * fat));
+  if (q) return { point: q.id };
+  const items = S.doc.items.filter(i => !getDef(i.type).flat && !/ledge|column|chase|shaft|panel/i.test(i.name) && inItem(p, i, px(2))).sort((a, b) => a.elev + a.h - (b.elev + b.h));
+  return items.length ? { item: items[items.length - 1].id } : null;
+}
+function finishCable(to) {
+  if (!cableDraft) return;
+  const c = { id: uid('cb'), kind: cableDraft.kind, from: cableDraft.from, to: to || cableDraft.path.pop(), path: cableDraft.path, route: 'floor', slack: 0.15, label: '' };
+  cableDraft = null;
+  if (!c.to) { requestDraw(); return; }
+  elec().cables.push(c); commit(); select([{ k: 'cable', id: c.id }]);
+  const L = cableLength(c); if (L) emit('toast', `${CABLE_KINDS[c.kind].name}: ${fmtFt(L.measured)} measured · buy ${L.buyFt ? L.buyFt + ' ft' : fmtFt(L.need)}`);
+}
+function drawPointSymbol(q, sel, ghost) {
+  const k = POINT_KINDS[q.kind] || POINT_KINDS.outlet, r = px(6.5);
+  ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(rad(q.rot || 0)); ctx.globalAlpha = ghost ? 0.55 : 1;
+  ctx.lineWidth = px(sel ? 2 : 1.3); ctx.strokeStyle = sel ? ACCENT : '#c2410c'; ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  if (k.sym === 'triangle') { ctx.moveTo(0, r * 1.1); ctx.lineTo(r, -r * 0.6); ctx.lineTo(-r, -r * 0.6); ctx.closePath(); }
+  else if (k.sym === 'square') ctx.rect(-r, -r, 2 * r, 2 * r);
+  else if (k.sym === 'strip') ctx.rect(-r * 2.2, -r * 0.55, r * 4.4, r * 1.1);
+  else ctx.arc(0, 0, r, 0, 7);
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = sel ? ACCENT : '#c2410c'; ctx.font = `700 ${px(7)}px system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const glyph = { outlet: '⚡', usb: 'U', gfci: 'G', data: 'D', coax: 'TV', hdmi: 'H', switch: 'S', floorbox: '⚡', strip: '▪▪▪', ceiling: '✕' }[q.kind] || '';
+  ctx.save(); ctx.rotate(-rad(q.rot || 0)); ctx.fillText(glyph, 0, px(0.5)); ctx.restore();
+  ctx.restore();
+}
+function drawElec() {
+  const E = S.doc.elec; if (!E) return;
+  for (const c of E.cables) {
+    const L = cableLength(c); if (!L) continue;
+    const sel = isSel('cable', c.id), col = (CABLE_KINDS[c.kind] || CABLE_KINDS.other).color;
+    ctx.strokeStyle = sel ? ACCENT : col; ctx.lineWidth = px(sel ? 3.5 : 2.5); ctx.lineJoin = 'round'; ctx.setLineDash(c.route === 'direct' ? [px(6), px(4)] : []);
+    ctx.beginPath(); L.pts.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y))); ctx.stroke(); ctx.setLineDash([]);
+    let best = -1, at = L.pts[0]; // label the middle of the longest stretch
+    for (let i = 1; i < L.pts.length; i++) { const len = dist(L.pts[i - 1], L.pts[i]); if (len > best) { best = len; at = { x: (L.pts[i - 1].x + L.pts[i].x) / 2, y: (L.pts[i - 1].y + L.pts[i].y) / 2 }; } }
+    if (view.zoom > 25) text(at, `${fmtFt(L.measured)}${L.buyFt ? ' → ' + L.buyFt + ' ft' : ''}`, { size: 10, color: sel ? ACCENT : col, bg: 'rgba(255,255,255,.85)', bold: true });
+  }
+  for (const q of E.points) drawPointSymbol(q, isSel('elec', q.id));
+  if (S.tool === 'outlet' && preview?.kind) drawPointSymbol(preview, false, true);
+  if (S.tool === 'cable') {
+    if (hover && (hover.point || hover.item)) { const h2 = hover.point ? E.points.find(q => q.id === hover.point) : S.doc.items.find(i => i.id === hover.item);
+      if (h2) { ctx.strokeStyle = ACCENT; ctx.lineWidth = px(2); ctx.beginPath(); ctx.arc(h2.x, h2.y, px(11), 0, 7); ctx.stroke(); } }
+    if (cableDraft) {
+      const pts = [cableDraft.from.point ? E.points.find(q => q.id === cableDraft.from.point) : cableDraft.from.item ? S.doc.items.find(i => i.id === cableDraft.from.item) : cableDraft.from, ...cableDraft.path, cursor].filter(Boolean);
+      ctx.strokeStyle = (CABLE_KINDS[cableDraft.kind] || CABLE_KINDS.other).color; ctx.lineWidth = px(2.5); ctx.setLineDash([px(5), px(4)]);
+      ctx.beginPath(); pts.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y))); ctx.stroke(); ctx.setLineDash([]);
+    }
+  }
 }
 
 function placeWallPoint(pt) {
@@ -565,6 +645,8 @@ function onMove(e) {
     preview = it;
   } else if (tool === 'measure' || tool === 'calibrate') { const s = snap(p, { anchor: measureFrom, shift: e.shiftKey, grid: tool === 'measure' }); if (tool === 'measure') cursor = s; }
   else if (tool === 'room') snap(p);
+  else if (tool === 'outlet') preview = outletAt(p, e);
+  else if (tool === 'cable') { cursor = p; hover = endAt(p); }
   else if (tool === 'arc') cursor = snap(p, { anchor: arc && !arc.b ? arc.a : null, shift: e.shiftKey });
   requestDraw();
 }
@@ -615,6 +697,12 @@ function onDrag(e, p) {
     d.moved = true; touch();
   } else if (d.t === 'marquee') d.b = p;
   else if (d.t === 'room') d.b = snap(p);
+  else if (d.t === 'elec') {
+    if (!d.moved && dist(w2s(p), w2s(d.start)) < 4) return;
+    const q = d.q, k = POINT_KINDS[q.kind] || POINT_KINDS.outlet, f = k.wall && wallFace(p, 1.5);
+    if (f) Object.assign(q, { x: f.x, y: f.y, rot: f.rot, wallId: f.wallId }); else { q.x = gs(p.x); q.y = gs(p.y); }
+    d.moved = true; touch();
+  }
   requestDraw();
 }
 
@@ -697,6 +785,7 @@ function onDblClick(e) {
   if (e.type === 'dblclick' && performance.now() - lastTouchAt < 800) return; // already handled as a double-tap
   const p = s2w(evPos(e));
   if (S.tool === 'wall') { draft = null; preview = null; typed = ''; requestDraw(); return; }
+  if (S.tool === 'cable') { finishCable(null); return; }
   if (S.tool !== 'select') return;
   const hit = hitTest(p);
   if (hit?.k === 'room') { const r = find('room', hit.id), n = prompt('Room name:', r.meta.name); if (n) { r.meta.name = n; commit(); } }
@@ -716,6 +805,7 @@ export function handleKey(e) {
   if (e.key === 'Escape') {
     if (drag) { drag = null; revert(); requestDraw(); return true; }
     if (typed) { typed = ''; requestDraw(); return true; }
+    if (cableDraft) { finishCable(null); return true; }
     if (draft || measureFrom || calibFrom || arc) { draft = null; measureFrom = null; calibFrom = null; preview = null; arc = null; requestDraw(); return true; }
     if (S.tool !== 'select') { setTool('select'); return true; }
     if (S.sel.length) { select([]); return true; }
@@ -731,8 +821,8 @@ function openContext(clientX, clientY) {
 }
 
 /** Finish the wall / curve / measurement being drawn (the touch equivalent of Esc or double-click). */
-export function finishDrawing() { draft = null; measureFrom = null; calibFrom = null; arc = null; preview = null; typed = ''; requestDraw(); }
-export const isDrawing = () => !!(draft || measureFrom || calibFrom || arc);
+export function finishDrawing() { if (cableDraft) finishCable(null); draft = null; measureFrom = null; calibFrom = null; arc = null; preview = null; typed = ''; requestDraw(); }
+export const isDrawing = () => !!(draft || measureFrom || calibFrom || arc || cableDraft);
 
 export function initEditor(canvas) {
   cv = canvas; ctx = cv.getContext('2d');
@@ -753,11 +843,12 @@ export function initEditor(canvas) {
   });
   on('doc', requestDraw); on('sel', requestDraw); on('prefs', requestDraw);
   on('tool', () => {
-    draft = null; measureFrom = null; calibFrom = null; preview = null; typed = ''; guides = []; snapMark = null; hover = null; arc = null;
+    draft = null; measureFrom = null; calibFrom = null; preview = null; typed = ''; guides = []; snapMark = null; hover = null; arc = null; cableDraft = null;
     cv.style.cursor = { select: 'default', pan: 'grab' }[S.tool] || 'crosshair';
     status({ wall: 'Click to start a wall. Type a length + Enter for exact size. Double-click or Esc to finish.', room: 'Drag to draw a rectangular room.', arc: 'Curved wall: click the start, click the end, then move to set the curve and click.',
       door: 'Hover a wall and click to place a door.', window: 'Hover a wall and click to place a window.', measure: 'Click two points to add a dimension.',
-      label: 'Click where the label should go.', place: 'Click to place. Shift-click to place several. Alt disables wall snapping.', calibrate: 'Click two points on the image that are a known distance apart.', pan: 'Drag to pan.' }[S.tool] || '');
+      label: 'Click where the label should go.', outlet: 'Click a wall to add the point (floor boxes and power strips go anywhere). Drag points along a wall to move them.',
+      cable: 'Click an outlet or a piece of furniture to start, click to add bends, click the other end to finish (double-click or Esc ends it loose).', place: 'Click to place. Shift-click to place several. Alt disables wall snapping.', calibrate: 'Click two points on the image that are a known distance apart.', pan: 'Drag to pan.' }[S.tool] || '');
     requestDraw();
   });
   resize();

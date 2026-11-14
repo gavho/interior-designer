@@ -1,11 +1,11 @@
 // Entry point: boot the store, wire up the editor, UI and (lazily) the 3D view, and global shortcuts.
 import { S, boot, setDoc, setTool, setPref, undo, redo, select } from './state.js';
 import { initEditor, handleKey, zoomFit } from './editor2d.js';
-import { initUI, set3d, setView, toast, saveToDevice, openProject, printPlan } from './ui.js';
+import { initUI, set3d, setView, toast, saveSmart, saveFile, openProject, printPlan } from './ui.js';
 import { loadMine } from './sample.js';
 import * as ops from './ops.js';
 
-const TOOL_KEYS = { v: 'select', h: 'pan', w: 'wall', a: 'arc', r: 'room', d: 'door', n: 'window', m: 'measure', t: 'label' };
+const TOOL_KEYS = { v: 'select', h: 'pan', w: 'wall', a: 'arc', r: 'room', d: 'door', n: 'window', m: 'measure', t: 'label', o: 'outlet', k: 'cable' };
 let api3d = null;
 
 function onKey(e) {
@@ -23,7 +23,7 @@ function onKey(e) {
     if (k === 'v') { ops.paste(); return done(); }
     if (k === 'd') { ops.duplicateSelection(); return done(); }
     if (k === 'a') { select(S.doc.items.filter(i => !i.locked).map(i => ({ k: 'item', id: i.id }))); return done(); }
-    if (k === 's') { saveToDevice(); return done(); }
+    if (k === 's') { e.shiftKey ? saveFile(true) : saveSmart(); return done(); }
     if (k === 'o') { openProject(); return done(); }
     if (k === 'p') { printPlan(); return done(); }
     return;
@@ -40,7 +40,7 @@ function onKey(e) {
 
 async function start() {
   const saved = await boot();
-  if (saved?.doc?.walls) { setDoc(saved.doc, saved.assets || {}); S.slot = saved.slot || null; } else await loadMine(); // first visit opens the real apartment
+  if (saved?.doc?.walls) { setDoc(saved.doc, saved.assets || {}); S.slot = saved.slot || null; S.file = saved.file || null; } else await loadMine(); // first visit opens the real apartment
   window.app = { S, ops }; // handy from the dev-tools console
   initUI();
   initEditor(document.getElementById('c2d'));
@@ -57,3 +57,6 @@ async function start() {
   }
 }
 start();
+// offline support / installable desktop app (not needed inside the Electron shell, which bundles everything)
+if ('serviceWorker' in navigator && !window.desktop && (location.protocol === 'https:' || location.hostname === 'localhost'))
+  navigator.serviceWorker.register('./sw.js').catch(() => {});

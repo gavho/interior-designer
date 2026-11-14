@@ -46,6 +46,45 @@ the retailer's colours under **Finish → Retailer colours**.
 canvas art, walnut floating and bracket shelves, a ladder bookshelf, an arc floor lamp, a wall sconce, a charcoal rug, a
 monitor riser and faux plants in black pots. Each piece is sized from its retailer listing and links to it under **Shopping**.
 
+## Saving
+
+- **Autosave**: the current plan is always kept in the browser on this device.
+- **Files** (`.interior.json`): *File → Save as file…* writes a real file. In Chrome / Edge on a computer and in the
+  desktop app, *Ctrl+S* then saves back to the same file and *File → Open file…* / the recent-files list reopen it.
+  On iPad the share sheet saves to Files or iCloud Drive. Images and 3D models you added are stored inside the file.
+- **My projects**: named projects on this device. The open one saves itself as you work and keeps a version every
+  10 minutes (the last 30); *My projects & history…* restores any of them. *Back up all projects…* writes one file
+  with everything, and opening that file on another device restores the projects there.
+
+## Electrical outlets and cable runs
+
+The **Power** tab and the two tools at the bottom of the tool rail (O, K) add an electrical layer:
+
+- **Points**: duplex / USB / GFCI outlets, floor boxes, power strips, ethernet, TV and HDMI plates, switches and
+  ceiling boxes. Wall points snap to the nearest wall face at the usual height; set the exact height, a label and a
+  circuit in Properties. The outlets on the window ledges are already there.
+- **Cables**: start on a point or a piece of furniture, click to add bends, finish on the other end. The length adds
+  the drop from each end to the route (along the floor, across a desk, or straight) plus slack, and suggests the
+  next standard cable size to buy. The cable schedule lists every run with totals per kind; export it as CSV.
+- *Options → Electrical* hides or shows the layer in 2D and 3D.
+
+## Desktop app
+
+- **Install from the browser**: the site works offline once opened, and Chrome / Edge offer *Install Interior
+  Designer* to run it in its own window.
+- **Electron app** (`desktop/`): native Save / Open dialogs, the 3D engine bundled for offline use and full-size
+  image export. On a computer with Node.js:
+
+  ```bash
+  cd desktop
+  npm install
+  npm start          # run it
+  npm run dist       # build an installer for this computer (macOS .dmg, Windows .exe, Linux AppImage)
+  ```
+
+See [docs/PLAN.md](docs/PLAN.md) for what comes next (render presets, material editor, custom catalogue, layers,
+elevation views, circuits and auto-routed cables).
+
 ## What it does
 
 **Build**

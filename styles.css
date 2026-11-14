@@ -36,7 +36,7 @@ kbd { font: 11px ui-monospace, Consolas, monospace; background: #eef0f3; border:
 .logo { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; background: var(--accent); color: #fff; font-size: 15px; }
 #topbar .docname { width: 190px; background: transparent; border-color: transparent; color: #fff; font-weight: 500; }
 #topbar .docname:hover, #topbar .docname:focus { background: #2a313b; border-color: #3b4350; outline: none; }
-.saved { font-size: 11px; color: #8fd19e; width: 36px; }
+.saved { font-size: 11px; color: #8fd19e; min-width: 36px; white-space: nowrap; }
 .sep { width: 1px; height: 22px; background: #3b4350; margin: 0 4px; }
 #topbar .icon { padding: 4px 6px; }
 .ico { display: inline-grid; width: 20px; height: 20px; }
@@ -272,3 +272,16 @@ kbd { font: 11px ui-monospace, Consolas, monospace; background: #eef0f3; border:
 .seg2 { display: flex; gap: 4px; background: #f0f2f5; border-radius: 8px; padding: 3px; }
 .seg2 button { flex: 1; border-color: transparent; background: transparent; font-size: 12.5px; padding: 6px 4px; }
 .seg2 button.on { background: #fff; border-color: var(--line); color: var(--accent); font-weight: 600; box-shadow: 0 1px 3px rgba(20, 30, 50, .1); }
+
+/* ---- power tab ---- */
+.btnwrap { display: flex; flex-wrap: wrap; gap: 5px; }
+.btnwrap button { font-size: 12px; padding: 5px 9px; display: inline-flex; align-items: center; gap: 6px; }
+.btnwrap button.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+i.swatch { display: inline-block; width: 11px; height: 11px; border-radius: 3px; flex: none; margin-right: 5px; vertical-align: -1px; }
+.sched { display: grid; gap: 4px; margin-bottom: 8px; }
+.schedrow, .listrow { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; border-color: var(--line); padding: 6px 8px; }
+.schedrow.on, .listrow.on { border-color: var(--accent); background: var(--accent-soft); }
+.schedrow > span:nth-child(2) { flex: 1; min-width: 0; display: grid; }
+.schedrow small, .listrow small { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.schedrow .len { text-align: right; display: grid; font-weight: 600; font-variant-numeric: tabular-nums; }
+.list { display: grid; gap: 3px; max-height: 260px; overflow: auto; }

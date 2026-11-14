@@ -1,6 +1,6 @@
 // Application chrome: top bar, tool rail, catalogue / build / style / objects / insights tabs,
 // the properties inspector, dialogs, context menu and toasts.
-import { S, on, emit, commit, touch, undo, redo, canUndo, canRedo, select, selOf, find, setTool, setPref, setDoc, newDoc, exportProject, saveLibrary, listProjects, saveSlot, openSlot, deleteSlot } from './state.js';
+import { S, on, emit, commit, touch, undo, redo, canUndo, canRedo, select, selOf, find, isSel, setTool, setPref, setDoc, newDoc, exportProject, parseProject, exportBackup, importBackup, restoreSnapshot, kvGet, kvSet, saveLibrary, listProjects, saveSlot, openSlot, deleteSlot } from './state.js';
 import { h, uid, fmtLen, parseLen, fmtArea, fmtMoney, download, readAsDataURL, pickFile, normDeg, dist, clamp, add, sub, mul } from './util.js';
 import { CATALOG, CATEGORIES, getDef, thumbnail } from './catalog.js';
 import { FLOORS, PALETTES, SWATCHES, floorCanvas, WALL_FINISHES, WOODS, COUNTERS } from './materials.js';
@@ -8,6 +8,7 @@ import * as ops from './ops.js';
 import { analyze } from './analysis.js';
 import * as ed from './editor2d.js';
 import { loadSample, loadMine } from './sample.js';
+import { POINT_KINDS, CABLE_KINDS, ROUTES, elec, schedule, cableLength, fmtFt } from './electrical.js';
 
 let api3d = null;
 export const set3d = m => { api3d = m; build3dHud(); };
@@ -19,6 +20,7 @@ const ICONS = {
   select: 'M5 3l14 8-6 2-2 6z', pan: 'M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3',
   wall: 'M3 6h18v12H3zM3 12h18M9 6v6M15 12v6', arc: 'M4 20A16 16 0 0 1 20 4M2 20h4M20 2v4', room: 'M4 4h16v16H4zM4 14h8v6', door: 'M5 20V4h2v16M7 4a13 13 0 0 1 13 16H7',
   window: 'M4 5h16v14H4zM12 5v14M4 12h16', measure: 'M3 17L17 3l4 4L7 21zM7 13l2 2M10 10l2 2M13 7l2 2', label: 'M5 6h14M12 6v13M9 19h6',
+  outlet: 'M7 3h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM10 8v3M14 8v3M12 15v1', cable: 'M4 20c4 0 4-6 8-6s4 6 8 6M4 20v-3M20 20v-6M8 4h8v5H8z',
   undo: 'M8 5L3 10l5 5M3 10h11a5.5 5.5 0 0 1 0 11h-3', redo: 'M16 5l5 5-5 5M21 10H10a5.5 5.5 0 0 0 0 11h3',
 };
 const icon = n => h('span.ico', { html: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${ICONS[n]}"/></svg>` });
@@ -85,7 +87,7 @@ function buildTopbar() {
     h('button.menu-btn', { onclick: e => fileMenu(e.currentTarget) }, 'File ▾'), name, saved,
     h('div.sep'), undoB, redoB, h('div.sep'),
     tog('snapGrid', 'Grid snap', 'Snap to the measurement grid (G)'), tog('snapAngle', 'Angle snap', 'Snap walls to 15° steps'), tog('magnet', 'Wall magnet', 'Furniture snaps flush to walls'),
-    tog('showDims', 'Dimensions', 'Show wall lengths'), tog('showLabels', 'Labels', 'Show room names and areas'),
+    tog('showDims', 'Dimensions', 'Show wall lengths'), tog('showLabels', 'Labels', 'Show room names and areas'), tog('showElec', 'Electrical', 'Show outlets and cable runs'),
     h('button.menu-btn.optmenu', { onclick: e => { const r = e.currentTarget.getBoundingClientRect(); menu(r.left, r.bottom + 4, [...document.querySelectorAll('#topbar .toggle')].map(b => ({ label: (S.prefs[b.dataset.pref] ? '✓ ' : '\u2003 ') + b.textContent, run: () => setPref(b.dataset.pref, !S.prefs[b.dataset.pref]) }))); } }, 'Options ▾'),
     h('div.grow'), h('button.drawer-btn.dr', { title: 'Show the properties panel', onclick: () => setPanel('right') }, 'Properties'), unit, viewSeg, h('button.menu-btn', { onclick: helpDialog, title: 'Keyboard shortcuts (?)' }, '?'));
   const sync = () => {
@@ -96,7 +98,7 @@ function buildTopbar() {
     unit.value = S.doc.units;
   };
   on('history', sync); on('prefs', sync); on('load', sync);
-  on('saved', () => { saved.textContent = 'Saved'; clearTimeout(saved._t); saved._t = setTimeout(() => (saved.textContent = ''), 1500); });
+  on('saved', kind => { saved.textContent = kind === 'file' ? 'Saved to file' : 'Saved'; saved.title = S.file ? `File: ${S.file.name}` : S.slot ? 'Saving automatically to My projects' : 'Autosaved on this device'; clearTimeout(saved._t); saved._t = setTimeout(() => (saved.textContent = ''), 1800); });
   sync();
 }
 
@@ -143,50 +145,65 @@ export const isTouch = matchMedia('(pointer: coarse)').matches;
 
 export function setView(v) { $('app').dataset.view = v; setPref('view', v); placeTabs(); }
 
-function fileMenu(anchor) {
-  const r = anchor.getBoundingClientRect();
+async function fileMenu(anchor) {
+  const r = anchor.getBoundingClientRect(), recents = await recentFiles(), canFile = !!(window.desktop || (window.showSaveFilePicker && !isTouch));
   menu(r.left, r.bottom + 4, [
-    { label: 'New empty plan', run: () => confirm('Start a new empty plan? Save the current one first if you want to keep it.') && (setDoc(newDoc()), S.slot = null) },
-    { label: 'New from my apartment (980 sq ft)', run: () => confirm('Start a fresh copy of your apartment? Save the current plan first if you want to keep it.') && loadMine().then(() => { S.slot = null; ed.zoomFit(); toast('Your apartment is ready to furnish'); }) },
+    { label: 'New empty plan', run: () => confirm('Start a new empty plan? Save the current one first if you want to keep it.') && (setDoc(newDoc()), S.slot = null, S.file = null) },
+    { label: 'New from my apartment (980 sq ft)', run: () => confirm('Start a fresh copy of your apartment? Save the current plan first if you want to keep it.') && loadMine().then(() => { S.slot = null; S.file = null; ed.zoomFit(); toast('Your apartment is ready to furnish'); }) },
     '-',
-    { label: S.slot ? 'Save to My projects' : 'Save to My projects…', key: 'Ctrl+S', run: saveToDevice },
-    { label: 'Save as a new project…', run: () => saveToDevice(true) },
-    { label: 'My projects…', run: projectsDialog },
+    { label: S.file ? `Save to ${S.file.name}` : S.slot ? 'Save (My projects)' : 'Save…', key: 'Ctrl+S', run: saveSmart },
+    canFile ? { label: 'Save as file…', key: 'Ctrl+Shift+S', run: () => saveFile(true) } : { label: 'Save a copy to Files (.json)', run: () => saveFile(true) },
+    { label: 'Open file…', key: 'Ctrl+O', run: openProject },
+    ...recents.slice(0, 5).map(f => ({ label: `   ${f.name}`, run: () => openRecent(f) })),
     '-',
-    { label: 'Save a copy to Files (.json)', run: saveProject },
-    { label: 'Open from Files…', key: 'Ctrl+O', run: openProject },
+    { label: S.slot ? 'Save as a new project…' : 'Save to My projects…', run: () => saveToDevice(true) },
+    { label: 'My projects & history…', run: projectsDialog },
+    { label: 'Back up all projects…', run: backupAll },
     '-',
-    { label: 'Load sample apartment', run: () => loadSample().then(() => { S.slot = null; ed.zoomFit(); toast('Sample apartment loaded'); }) },
+    { label: 'Load sample apartment', run: () => loadSample().then(() => { S.slot = null; S.file = null; ed.zoomFit(); toast('Sample apartment loaded'); }) },
     { label: 'Import floor plan image to trace…', run: importTrace },
     '-',
     { label: 'Export 2D plan (PNG)', run: () => download(`${S.doc.name}-plan.png`, ed.exportPNG()) },
     { label: 'Export 3D view (PNG)', disabled: !api3d, run: () => { if (S.prefs.view === '2d') setView('split'); setTimeout(() => download(`${S.doc.name}-3d.png`, api3d.snapshot()), 150); } },
     { label: 'Export shopping list (CSV)', run: exportCSV },
+    { label: 'Export cable list (CSV)', run: exportCablesCSV },
     { label: 'Print plan', key: 'Ctrl+P', run: printPlan },
   ]);
 }
-/** Save into the app's own storage on this device (survives closing Safari; add the app to the Home Screen so iPadOS keeps it). */
-export async function saveToDevice(asNew = false) {
-  let name = S.doc.name;
-  if (asNew === true || !S.slot) { name = prompt('Save this project as:', S.doc.name); if (!name) return; }
-  try { const rec = await saveSlot(name.trim(), asNew === true); toast(`Saved “${rec.name}” to My projects`); }
-  catch { toast('Could not save on this device (storage may be full or blocked in private browsing)', 4000); }
+
+// ------------------------------------------------------------------ saving: files, My projects, history, backups
+const fileName = () => `${S.doc.name.replace(/[^\w -]+/g, '').trim() || 'plan'}.interior.json`;
+const canPickFiles = () => !!(window.desktop || (window.showSaveFilePicker && !isTouch));
+async function recentFiles() { try { return (await kvGet('recentFiles')) || []; } catch { return []; } }
+async function remember(f) {
+  const list = (await recentFiles()).filter(r => (f.path ? r.path !== f.path : r.name !== f.name));
+  try { await kvSet('recentFiles', [{ ...f, t: Date.now() }, ...list].slice(0, 8)); } catch {}
 }
-async function projectsDialog() {
-  const list = await listProjects(), when = t => new Date(t).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
-  let close = null;
-  const rows = list.length ? list.map(p => h('div.projrow', null,
-    h('div', null, h('b', null, p.name, p.id === S.slot ? ' (open now)' : ''), h('div.hint', null, `${when(p.saved)} · ${p.rooms || 0} rooms · ${p.items || 0} pieces`)),
-    h('div.stack', null,
-      btn('Open', async () => { try { await openSlot(p.id); ed.zoomFit(); close(); toast(`Opened “${p.name}”`); } catch { toast('That project could not be read'); } }, { cls: 'primary' }),
-      btn('Delete', async () => { if (confirm(`Delete “${p.name}” from this device?`)) { await deleteSlot(p.id); close(); projectsDialog(); } }, { cls: 'danger' }))))
-    : [h('p.hint', null, 'No saved projects yet. Use File → Save to My projects.')];
-  close = dialog('My projects', h('div', null, h('p.hint', null, 'Projects saved on this device. Use “Save a copy to Files” for a backup you can move to another device.'), ...rows),
-    [{ label: 'Save current plan here', run: () => saveToDevice(true) }, { label: 'Close' }]);
+/** Ctrl+S: back to the open file; or the open My projects entry (already autosaved); otherwise ask where. */
+export async function saveSmart() {
+  if (S.file) return saveFile(false);
+  if (S.slot) return saveToDevice();
+  return canPickFiles() ? saveFile(true) : saveToDevice();
 }
-/** A .json copy: on iPad this opens the share sheet so it can go to Files, iCloud Drive, AirDrop or email. */
-export async function saveProject() {
-  const name = `${S.doc.name.replace(/[^\w -]+/g, '') || 'plan'}.json`, data = exportProject();
+/** Save the project as a real file: desktop app / Chrome / Edge write to disk (and Ctrl+S re-saves there); iPad uses the share sheet. */
+export async function saveFile(as = false) {
+  const data = exportProject(), name = fileName();
+  try {
+    if (window.desktop) {
+      const res = !as && S.file?.path ? await window.desktop.saveFile(S.file.path, data) : await window.desktop.saveFileAs(name, data);
+      if (!res) return;
+      S.file = { path: res.path, name: res.name }; remember(S.file);
+    } else if (window.showSaveFilePicker && !isTouch) {
+      let handle = !as && S.file?.handle;
+      if (!handle) handle = await window.showSaveFilePicker({ suggestedName: name, types: [{ description: 'Interior Designer project', accept: { 'application/json': ['.json'] } }] });
+      const w = await handle.createWritable(); await w.write(data); await w.close();
+      S.file = { handle, name: handle.name }; remember(S.file);
+    } else return shareCopy(name, data);
+    emit('saved', 'file'); toast(`Saved to ${S.file.name}`);
+  } catch (e) { if (e?.name !== 'AbortError') toast('Could not save the file: ' + (e?.message || e), 4000); }
+}
+/** iPad / other browsers: share sheet (Save to Files, AirDrop, email) or a download. */
+async function shareCopy(name, data) {
   if (isTouch && navigator.canShare) {
     const file = new File([data], name, { type: 'application/json' });
     if (navigator.canShare({ files: [file] })) {
@@ -196,13 +213,76 @@ export async function saveProject() {
   }
   download(name, data, 'application/json'); toast(isTouch ? 'Saved to Files → Downloads' : 'Project saved to your downloads');
 }
-export async function openProject() {
-  const f = await pickFile(isTouch ? null : '.json,application/json'); if (!f) return; // iPad Files greys out .json when filtered by type
+export const saveProject = () => saveFile(true);
+/** Save into the app's own storage on this device; the entry then keeps itself up to date as you work. */
+export async function saveToDevice(asNew = false) {
+  let name = S.doc.name;
+  if (asNew === true || !S.slot) { name = prompt('Save this project in My projects as:', S.doc.name); if (!name) return; }
+  try { const rec = await saveSlot(name.trim(), asNew === true); S.file = null; toast(`Saved “${rec.name}” to My projects. Changes now save automatically.`, 3200); }
+  catch { toast('Could not save on this device (storage may be full or blocked in private browsing)', 4000); }
+}
+async function loadProjectText(text, file) {
   try {
-    const { assets, ...doc } = JSON.parse(await f.text());
-    if (!Array.isArray(doc.walls) || !Array.isArray(doc.items)) throw new Error('not a plan');
-    setDoc(doc, assets || {}); S.slot = null; ed.zoomFit(); toast(`Opened “${doc.name}”`);
-  } catch { toast('That file is not an Interior Designer project'); }
+    const { doc, assets } = parseProject(text);
+    setDoc(doc, assets); S.slot = null; S.file = file || null; if (file) remember(file);
+    ed.zoomFit(); toast(`Opened “${doc.name}”`);
+  } catch (e) {
+    if (e.backup) { if (confirm(`This is a backup of ${e.backup.projects?.length || 0} projects. Add them to My projects on this device?`)) { const n = await importBackup(e.backup); toast(`Restored ${n} project${n === 1 ? '' : 's'} into My projects`); projectsDialog(); } return; }
+    toast('That file is not an Interior Designer project');
+  }
+}
+export async function openProject() {
+  try {
+    if (window.desktop) { const f = await window.desktop.openFile(); if (f) await loadProjectText(f.text, { path: f.path, name: f.name }); return; }
+    if (window.showOpenFilePicker && !isTouch) {
+      const [handle] = await window.showOpenFilePicker({ types: [{ description: 'Interior Designer project', accept: { 'application/json': ['.json'] } }] });
+      return loadProjectText(await (await handle.getFile()).text(), { handle, name: handle.name });
+    }
+  } catch (e) { if (e?.name === 'AbortError') return; }
+  const f = await pickFile(isTouch ? null : '.json,application/json'); if (!f) return; // iPad Files greys out .json when filtered by type
+  loadProjectText(await f.text());
+}
+async function openRecent(f) {
+  try {
+    if (f.path && window.desktop) { const r = await window.desktop.readFile(f.path); if (r) return loadProjectText(r.text, { path: f.path, name: f.name }); }
+    if (f.handle) {
+      if ((await f.handle.queryPermission?.({ mode: 'readwrite' })) !== 'granted' && (await f.handle.requestPermission?.({ mode: 'readwrite' })) !== 'granted') return;
+      return loadProjectText(await (await f.handle.getFile()).text(), { handle: f.handle, name: f.name });
+    }
+  } catch {}
+  toast(`Could not open ${f.name}; it may have been moved or deleted`);
+}
+async function backupAll() {
+  const data = await exportBackup(), name = `interior-designer-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  if (window.desktop) { const r = await window.desktop.saveFileAs(name, data); if (r) toast(`Backup saved to ${r.name}`); return; }
+  if (window.showSaveFilePicker && !isTouch) {
+    try { const hd = await window.showSaveFilePicker({ suggestedName: name }); const w = await hd.createWritable(); await w.write(data); await w.close(); toast(`Backup saved to ${hd.name}`); } catch (e) { if (e?.name !== 'AbortError') toast('Could not save the backup'); }
+    return;
+  }
+  shareCopy(name, data);
+}
+const when = t => new Date(t).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+async function projectsDialog() {
+  const list = await listProjects();
+  let close = null;
+  const rows = list.length ? list.map(p => h('div.projrow', null,
+    h('div', null, h('b', null, p.name, p.id === S.slot ? ' (open now)' : ''), h('div.hint', null, `${when(p.saved)} · ${p.rooms || 0} rooms · ${p.items || 0} pieces${p.snaps?.length ? ` · ${p.snaps.length} versions` : ''}`)),
+    h('div.stack', null,
+      btn('Open', async () => { try { await openSlot(p.id); S.file = null; ed.zoomFit(); close(); toast(`Opened “${p.name}”`); } catch { toast('That project could not be read'); } }, { cls: 'primary' }),
+      p.snaps?.length ? btn('History', () => { close(); historyDialog(p); }) : null,
+      btn('Delete', async () => { if (confirm(`Delete “${p.name}” and its history from this device?`)) { await deleteSlot(p.id); close(); projectsDialog(); } }, { cls: 'danger' }))))
+    : [h('p.hint', null, 'No saved projects yet. Use File → Save to My projects.')];
+  close = dialog('My projects', h('div', null, h('p.hint', null, 'Projects kept on this device. An open project saves itself as you work and keeps a version every 10 minutes (the last 30). Use Back up all projects to move them to another device.'), ...rows),
+    [{ label: 'Back up all…', run: backupAll }, { label: 'Save current plan here', run: () => saveToDevice(true) }, { label: 'Close' }]);
+}
+function historyDialog(p) {
+  let close = null;
+  const rows = [...(p.snaps || [])].reverse().map(sn => h('div.projrow', null, h('div', null, h('b', null, when(sn.t)), h('div.hint', null, `${sn.items ?? '?'} pieces`)),
+    btn('Restore', async () => {
+      if (!confirm(`Restore “${p.name}” to ${when(sn.t)}? The current state stays in the history.`)) return;
+      try { if (S.slot === p.id) await saveSlot(p.name); await restoreSnapshot(p.id, sn.key); S.file = null; ed.zoomFit(); close(); toast(`Restored the version from ${when(sn.t)}`); } catch { toast('That version could not be read'); }
+    })));
+  close = dialog(`History: ${p.name}`, h('div', null, h('p.hint', null, 'Versions are kept every 10 minutes of editing.'), ...rows), [{ label: 'Back', run: () => { projectsDialog(); } }, { label: 'Close' }]);
 }
 async function importTrace() {
   const f = await pickFile('image/*'); if (!f) return;
@@ -222,8 +302,8 @@ function exportCSV() {
 export function printPlan() { const im = $('printimg'); im.onload = () => { print(); im.onload = null; }; im.src = ed.exportPNG(2); }
 
 function helpDialog() {
-  const keys = [['V', 'Select / move'], ['W', 'Draw walls'], ['A', 'Curved wall (start, end, then bend)'], ['R', 'Rectangle room'], ['D', 'Door'], ['N', 'Window'], ['M', 'Measure / dimension'], ['T', 'Text label'], ['H or Space-drag', 'Pan'], ['Scroll', 'Zoom'], ['F', 'Zoom to fit'],
-    ['Q / E', 'Rotate selection 90° (Shift: 15°)'], ['Arrows', 'Nudge (Shift: larger)'], ['Ctrl+D', 'Duplicate'], ['Ctrl+C / V', 'Copy / paste'], ['Del', 'Delete'], ['Ctrl+Z / Y', 'Undo / redo'], ['Ctrl+A', 'Select all furniture'],
+  const keys = [['V', 'Select / move'], ['W', 'Draw walls'], ['A', 'Curved wall (start, end, then bend)'], ['R', 'Rectangle room'], ['D', 'Door'], ['N', 'Window'], ['M', 'Measure / dimension'], ['T', 'Text label'], ['O', 'Outlet / jack / switch'], ['K', 'Cable run'], ['H or Space-drag', 'Pan'], ['Scroll', 'Zoom'], ['F', 'Zoom to fit'],
+    ['Q / E', 'Rotate selection 90° (Shift: 15°)'], ['Arrows', 'Nudge (Shift: larger)'], ['Ctrl+D', 'Duplicate'], ['Ctrl+C / V', 'Copy / paste'], ['Del', 'Delete'], ['Ctrl+Z / Y', 'Undo / redo'], ['Ctrl+S', 'Save (to the open file or project)'], ['Ctrl+Shift+S', 'Save as a file'], ['Ctrl+O', 'Open a file'], ['Ctrl+A', 'Select all furniture'],
     ['G', 'Toggle grid snap'], ['1 / 2 / 3', '2D / split / 3D view'], ['Esc', 'Cancel / deselect'], ['Double-click wall', 'Split wall'], ['Double-click in 3D', 'Zoom in on a piece'], ['Double-click room', 'Rename room'], ['Shift while drawing', 'Lock to 45° steps'], ['Alt while dragging', 'Ignore snapping']];
   const gestures = [['Tap', 'Select (tap again and drag to move)'], ['Drag on the floor', 'Pan the plan (Apple Pencil: box-select)'], ['Pinch', 'Zoom'], ['Two-finger drag', 'Pan while drawing'], ['Long-press', 'Actions menu (split wall, add door, lock…)'],
     ['Double-tap', 'Rename room / split wall / zoom to a piece in 3D'], ['Drawing tools', 'Touch, slide to aim, lift to place; tap ✓ Done to finish'], ['‹ › edge tabs', 'Hide or show the side panels'], ['⇄ on the toolbar', 'Flip a sofa between left- and right-hand facing'], ['☰ Panel / Properties', 'Open the side panels on a narrow screen']];
@@ -233,7 +313,7 @@ function helpDialog() {
 }
 
 // ------------------------------------------------------------------ tool rail
-const TOOLS = [['select', 'Select (V)'], ['pan', 'Pan (H)'], ['wall', 'Draw walls (W)'], ['arc', 'Curved wall (A)'], ['room', 'Rectangle room (R)'], ['door', 'Door (D)'], ['window', 'Window (N)'], ['measure', 'Measure (M)'], ['label', 'Text label (T)']];
+const TOOLS = [['select', 'Select (V)'], ['pan', 'Pan (H)'], ['wall', 'Draw walls (W)'], ['arc', 'Curved wall (A)'], ['room', 'Rectangle room (R)'], ['door', 'Door (D)'], ['window', 'Window (N)'], ['measure', 'Measure (M)'], ['label', 'Text label (T)'], ['outlet', 'Outlet / jack / switch (O)'], ['cable', 'Cable run (K)']];
 function buildRail() {
   $('rail').replaceChildren(...TOOLS.map(([t, title]) => { const b = h('button', { title, onclick: () => setTool(t) }, icon(t)); b.dataset.tool = t; return b; }));
   const sync = () => $('rail').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.tool === S.tool));
@@ -242,7 +322,7 @@ function buildRail() {
 
 // ------------------------------------------------------------------ left panel
 let tab = 'furnish', cat = 'All', query = '';
-const TABS = [['furnish', 'Furnish'], ['build', 'Build'], ['style', 'Style'], ['objects', 'Objects'], ['insights', 'Insights']];
+const TABS = [['furnish', 'Furnish'], ['build', 'Build'], ['style', 'Style'], ['power', 'Power'], ['objects', 'Objects'], ['insights', 'Insights']];
 function buildLeft() {
   const body = h('div.tab-body');
   const tabs = h('div.tabs', null, TABS.map(([id, label]) => { const b = h('button', { onclick: () => { tab = id; render(); } }, label); b.dataset.tab = id; return b; }));
@@ -250,16 +330,72 @@ function buildLeft() {
   const render = () => {
     tabs.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
     const top = body.scrollTop;
-    body.replaceChildren(...{ furnish: furnishTab, build: buildTab, style: styleTab, objects: objectsTab, insights: insightsTab }[tab]());
+    body.replaceChildren(...{ furnish: furnishTab, build: buildTab, style: styleTab, power: powerTab, objects: objectsTab, insights: insightsTab }[tab]());
     body.scrollTop = top;
   };
   let t = 0;
   const later = () => { clearTimeout(t); t = setTimeout(() => { if (!$('left').contains(document.activeElement) || !/color|range|text|search/.test(document.activeElement.type)) render(); }, 60); };
-  on('history', later); on('sel', () => (tab === 'objects' || tab === 'style') && later()); on('load', later); on('library', render); on('prefs', () => tab === 'insights' && later());
+  on('history', later); on('sel', () => (tab === 'objects' || tab === 'style' || tab === 'power') && later()); on('load', later); on('library', render); on('prefs', () => tab === 'insights' && later());
   render();
 }
 
 function place(item) { setTool('place', { item }); }
+
+// ------------------------------------------------------------------ electrical: points, cables, cable schedule
+function powerTab() {
+  const E = elec(), rows = schedule(), FT = 0.3048;
+  const tot = {}; for (const r of rows) if (r.L) { const t = (tot[r.kind] ||= { n: 0, m: 0, color: r.color }); t.n++; t.m += r.L.need; }
+  return [
+    section('Add outlets, jacks and switches', h('div.btnwrap', null, Object.entries(POINT_KINDS).map(([k, d]) => btn(d.name, () => setTool('outlet', { kind: k }), { cls: S.tool === 'outlet' && S.toolOpt.kind === k ? 'on' : '' }))),
+      h('p.hint', null, 'Wall points snap to the nearest wall face at their usual height (outlets 12", switches 48"); change it in Properties.')),
+    section('Draw a cable run', h('div.btnwrap', null, Object.entries(CABLE_KINDS).map(([k, d]) => h('button' + (S.tool === 'cable' && S.toolOpt.kind === k ? '.on' : ''), { onclick: () => setTool('cable', { kind: k }) }, h('i.swatch', { style: { background: d.color } }), d.name))),
+      h('p.hint', null, 'Start on an outlet or a piece of furniture, tap to add bends, finish on the other end. Length counts the drop from each end to the floor (or across a desk) plus slack.')),
+    section(`Cable schedule (${rows.length})`,
+      rows.length ? h('div.sched', null, rows.map(r => h('button.schedrow' + (isSelC(r.c.id) ? '.on' : ''), { onclick: () => { select([{ k: 'cable', id: r.c.id }]); if (r.L) ed.centerOn(r.L.pts[Math.floor(r.L.pts.length / 2)]); } },
+        h('i.swatch', { style: { background: r.color } }), h('span', null, h('b', null, r.c.label || r.kind), h('small', null, `${r.from} → ${r.to}`)),
+        h('span.len', null, r.L ? fmtFt(r.L.measured) : '–', h('small', null, r.L ? (r.L.buyFt ? `buy ${r.L.buyFt} ft` : `≈ ${Math.ceil(r.L.need / FT)} ft`) : '')))))
+        : h('p.hint', null, 'No cables yet.'),
+      Object.keys(tot).length && h('div.kv', null, Object.entries(tot).map(([k, t]) => [h('span', null, h('i.swatch', { style: { background: t.color } }), `${k} × ${t.n}`), h('b', null, `${Math.ceil(t.m / FT)} ft incl. slack`)])),
+      h('div.stack', null, btn('Export cable list (CSV)', exportCablesCSV, { disabled: !rows.length }), check('Show electrical layer', S.prefs.showElec !== false, v => setPref('showElec', v)))),
+    section(`Points (${E.points.length})`, h('div.list', null, E.points.map(q => h('button.listrow' + (isSel('elec', q.id) ? '.on' : ''), { onclick: () => { select([{ k: 'elec', id: q.id }]); ed.centerOn(q); } },
+      `${q.label || POINT_KINDS[q.kind]?.name || q.kind}`, h('small', null, ` ${L(q.z)} high${q.circuit ? ' · ' + q.circuit : ''}`))))),
+  ];
+}
+const isSelC = id => S.sel.some(s => s.k === 'cable' && s.id === id);
+function exportCablesCSV() {
+  const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`, FT = 0.3048;
+  const rows = [['Label', 'Kind', 'From', 'To', 'Route', 'Measured (ft)', 'Measured (m)', 'Slack %', 'Needed (ft)', 'Buy (ft)'],
+    ...schedule().map(r => [r.c.label, r.kind, r.from, r.to, r.route, r.L && (r.L.measured / FT).toFixed(1), r.L && r.L.measured.toFixed(2), Math.round((r.c.slack ?? 0.15) * 100), r.L && (r.L.need / FT).toFixed(1), r.L?.buyFt ?? (r.L && Math.ceil(r.L.need / FT))])];
+  download(`${S.doc.name}-cables.csv`, rows.map(r => r.map(q).join(',')).join('\n'), 'text/csv');
+}
+function pointProps(q) {
+  const k = POINT_KINDS[q.kind] || POINT_KINDS.outlet;
+  return [h('h2', null, k.name),
+    section(null, row('Type', selectInput(Object.entries(POINT_KINDS).map(([id, d]) => [id, d.name]), q.kind, edit(v => (q.kind = v)))),
+      row('Label', textInput(q.label, edit(v => (q.label = v)), { placeholder: 'e.g. TV wall, desk left' })),
+      row('Height', lenInput(q.z, edit(v => (q.z = Math.max(0, v))))),
+      row('Circuit', textInput(q.circuit, edit(v => (q.circuit = v)), { placeholder: 'e.g. Breaker 7' })),
+      h('p.hint', null, k.wall ? 'Centre height above the floor. Drag the point to slide it along the wall or onto another wall.' : 'Height of the point above the floor.'),
+      check('Lock position', q.locked, edit(v => (q.locked = v)))),
+    section('Cables', (() => { const cs = elec().cables.filter(c => c.from?.point === q.id || c.to?.point === q.id);
+      return cs.length ? cs.map(c => h('div.kv', null, h('span', null, CABLE_KINDS[c.kind]?.name), h('b', null, fmtFt(cableLength(c)?.measured || 0)))) : h('p.hint', null, 'No cables to this point yet.'); })(),
+      btn('Start a cable here', () => setTool('cable', { kind: q.kind === 'data' ? 'ethernet' : q.kind === 'hdmi' ? 'hdmi' : 'power' }))),
+    btn('Delete', ops.deleteSelection, { cls: 'danger' })];
+}
+function cableProps(c) {
+  const Lc = cableLength(c), FT = 0.3048, endRow = (lab, end, z) => end?.item ? row(lab + ' height', lenInput(end.z ?? z ?? 0, edit(v => (end.z = Math.max(0, v))))) : null;
+  return [h('h2', null, c.label || CABLE_KINDS[c.kind]?.name || 'Cable'),
+    Lc && section(null, h('div.kv', null, h('span', null, 'From'), h('b', null, Lc.a.label), h('span', null, 'To'), h('b', null, Lc.b.label),
+      h('span', null, 'Measured'), h('b', null, `${fmtFt(Lc.measured)} (${Lc.measured.toFixed(2)} m)`), h('span', null, 'With slack'), h('b', null, fmtFt(Lc.need)),
+      h('span', null, 'Buy'), h('b', null, Lc.buyFt ? `${Lc.buyFt} ft cable` : `${Math.ceil(Lc.need / FT)} ft (by the foot)`))),
+    section(null, row('Kind', selectInput(Object.entries(CABLE_KINDS).map(([id, d]) => [id, d.name]), c.kind, edit(v => (c.kind = v)))),
+      row('Route', selectInput(Object.entries(ROUTES), c.route || 'floor', edit(v => (c.route = v)))),
+      row('Slack', numInput(Math.round((c.slack ?? 0.15) * 100), edit(v => (c.slack = Math.max(0, v) / 100)), { step: 5, min: 0 }), h('span.unit', null, '%')),
+      endRow('Start', c.from, Lc?.a.z), endRow('End', c.to, Lc?.b.z),
+      row('Label', textInput(c.label, edit(v => (c.label = v)), { placeholder: 'e.g. TV power, desk to router' })),
+      h('p.hint', null, 'Along the floor: drops from each end to the floor and back up. Across a surface: stays at desk height. Furniture ends start near the base of the piece; set the height where its port is.')),
+    btn('Delete', ops.deleteSelection, { cls: 'danger' })];
+}
 function card(item, label, sub, onRemove, onClick) {
   return h('button.card', { title: `${label} — ${sub}`, onclick: onClick || (() => place({ ...item, id: uid('it') })) }, thumbnail(item, 60), h('b', null, label), h('small', null, sub),
     onRemove && h('span.rm', { title: 'Remove from library', onclick: e => { e.stopPropagation(); onRemove(); } }, '×'));
@@ -564,7 +700,10 @@ function buildRight() {
     const idx = inside ? [...el.querySelectorAll('input,select')].indexOf(act) : -1, top = el.scrollTop;
     const items = selOf('item'), walls = selOf('wall'), ops_ = selOf('opening'), rooms = selOf('room'), labels = selOf('label'), dims = selOf('dim');
     let kids;
-    if (items.length) kids = itemProps(items);
+    const eps = selOf('elec'), cbs = selOf('cable');
+    if (eps.length) kids = pointProps(eps[0]);
+    else if (cbs.length) kids = cableProps(cbs[0]);
+    else if (items.length) kids = itemProps(items);
     else if (walls.length) kids = wallProps(walls);
     else if (ops_.length) kids = openingProps(ops_[0]);
     else if (rooms.length) kids = roomProps(rooms);

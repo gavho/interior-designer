@@ -15,6 +15,7 @@ import { partsFor, resolveColor, getDef } from './catalog.js';
 import { getFloor, floorCanvas, getFinish, finishCanvas, grainCanvas } from './materials.js';
 import { sits, surfaceUnder, riders } from './ops.js';
 import { contentBounds } from './editor2d.js';
+import { POINT_KINDS, CABLE_KINDS, cable3d } from './electrical.js';
 
 let renderer, scene, camera, controls, pane, sun, hemi, structure, itemsGroup, helpers, ground;
 let wallMode = 'auto', structSig = '', wallObjs = [], needFit = true;
@@ -195,6 +196,44 @@ function syncItems() {
   }
   for (const [id, o] of itemObjs) if (!seen.has(id)) { itemsGroup.remove(o.group); itemObjs.delete(id); }
   syncSelection();
+}
+
+// ---- electrical layer: wall plates, floor boxes, power strips and cable runs ----
+let elecGroup = null, elecSig = '';
+function syncElec() {
+  const E = S.doc.elec, show = S.prefs.showElec !== false;
+  const sig = show && E ? JSON.stringify([E, S.doc.items.map(i => [i.id, i.x, i.y, i.rot, i.w, i.d, i.elev, i.h]), S.sel.filter(s => s.k === 'elec' || s.k === 'cable')]) : '';
+  if (sig === elecSig) return;
+  elecSig = sig;
+  if (elecGroup) { scene.remove(elecGroup); elecGroup.traverse(o => o.geometry?.dispose?.()); }
+  elecGroup = new THREE.Group(); scene.add(elecGroup);
+  if (!sig) return;
+  const plate = mat('#f6f5f2'), slot = mat('#2b2d31'), hi = mat('#2f7df6');
+  for (const q of E.points) {
+    const k = POINT_KINDS[q.kind] || POINT_KINDS.outlet, g = new THREE.Group(), sel = isSel('elec', q.id);
+    if (k.wall) {
+      g.add(box(0.075, 0.12, 0.008, 0, 0, 0.004, sel ? hi : plate, false));
+      if (q.kind === 'switch') g.add(box(0.012, 0.03, 0.01, 0, 0, 0.01, slot, false));
+      else if (['data', 'coax', 'hdmi'].includes(q.kind)) g.add(box(0.022, 0.02, 0.006, 0, 0, 0.009, slot, false));
+      else for (const dy of [-0.025, 0.025]) g.add(box(0.03, 0.02, 0.006, 0, dy, 0.009, slot, false));
+      g.position.set(q.x, q.z, q.y);
+    } else if (q.kind === 'strip') { g.add(box(0.3, 0.04, 0.06, 0, 0.02, 0, sel ? hi : mat('#2b2d31'), false)); g.position.set(q.x, q.z - 0.02, q.y); }
+    else if (q.kind === 'ceiling') { g.add(box(0.12, 0.01, 0.12, 0, 0, 0, sel ? hi : plate, false)); g.position.set(q.x, q.z, q.y); }
+    else { g.add(box(0.12, 0.008, 0.12, 0, 0.004, 0, sel ? hi : mat('#b9bdc3', 'metal'), false)); g.position.set(q.x, 0, q.y); }
+    g.rotation.y = -rad(q.rot || 0);
+    elecGroup.add(g);
+  }
+  for (const c of E.cables) {
+    const pts = cable3d(c); if (!pts || pts.length < 2) continue;
+    const path = new THREE.CurvePath();
+    for (let i = 1; i < pts.length; i++) {
+      const a = new THREE.Vector3(pts[i - 1].x, pts[i - 1].z, pts[i - 1].y), b = new THREE.Vector3(pts[i].x, pts[i].z, pts[i].y);
+      if (a.distanceTo(b) > 1e-4) path.add(new THREE.LineCurve3(a, b));
+    }
+    if (!path.curves.length) continue;
+    const m = isSel('cable', c.id) ? hi : mat((CABLE_KINDS[c.kind] || CABLE_KINDS.other).color);
+    elecGroup.add(new THREE.Mesh(new THREE.TubeGeometry(path, Math.max(8, path.curves.length * 6), 0.006, 6, false), m));
+  }
 }
 
 // ---- walls, openings, floors ----
@@ -452,8 +491,8 @@ export function init3d(el) {
   scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture; // soft reflections on metal, glass and tile
   scene.environmentIntensity = 0.3;
 
-  const sync = () => { if (ptActive) stopRender(); if (!pane.offsetWidth) { structSig = ''; return; } syncStructure(); syncItems(); };
-  on('doc', sync); on('sel', syncSelection);
+  const sync = () => { if (ptActive) stopRender(); if (!pane.offsetWidth) { structSig = ''; return; } syncStructure(); syncItems(); syncElec(); };
+  on('doc', sync); on('sel', () => { syncSelection(); if (pane.offsetWidth) syncElec(); });
   on('load', () => { needFit = true; if (pane.offsetWidth) { sync(); needFit = false; setCamera('iso'); } });
   on('prefs', () => setTimeout(() => { resize(); if (!ptActive) sync(); }, 0));
   new ResizeObserver(() => { resize(); if (!ptActive) sync(); }).observe(pane);

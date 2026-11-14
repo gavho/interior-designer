@@ -242,6 +242,7 @@ export function h(tag, props, ...kids) {
 }
 
 export function download(name, data, type = 'application/octet-stream') {
+  if (window.desktop?.saveImage && typeof data === 'string' && data.startsWith('data:image')) { window.desktop.saveImage(name, data); return; } // desktop app: native save dialog
   const url = typeof data === 'string' && data.startsWith('data:') ? data : URL.createObjectURL(new Blob([data], { type }));
   const a = h('a', { href: url, download: name });
   document.body.append(a); a.click(); a.remove();

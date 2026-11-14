@@ -1,6 +1,6 @@
 // One-time fixes for plans saved before a correction to the apartment template, so saved work keeps its furniture.
 import { uid } from './util.js';
-import { buildSample, roomDetails, SCALE as NEW_SCALE } from './sample.js';
+import { buildSample, roomDetails, ledgeOutlets, SCALE as NEW_SCALE } from './sample.js';
 import { makeItem } from './ops.js';
 
 const S = 0.0128, P = (x, y) => ({ x: +(x * S).toFixed(4), y: +(y * S).toFixed(4) });
@@ -76,7 +76,13 @@ function kitchen(doc) {
   if (!doc.items.some(i => i.type === 'track_light')) doc.items.push(makeItem('track_light', { ...Q(540, 445), rot: 0, w: 1.6, name: 'Track light' }));
 }
 
-const FIXES = [['nook1', bedroomNook], ['layout2', retrace], ['details1', details], ['curtain1', curtain], ['baldoor1', balconyDoor], ['kitchen2', kitchen]];
+/** Electrical layer: every plan gets one; the window-ledge outlets become real points. */
+function electrical(doc) {
+  doc.elec ??= { points: [], cables: [] };
+  if (!doc.elec.points.length) doc.elec.points.push(...ledgeOutlets(doc.items || []));
+}
+
+const FIXES = [['nook1', bedroomNook], ['layout2', retrace], ['details1', details], ['curtain1', curtain], ['baldoor1', balconyDoor], ['kitchen2', kitchen], ['elec1', electrical]];
 export function migrate(doc) {
   doc.fixes = doc.fixes || [];
   for (const [id, fn] of FIXES) if (!doc.fixes.includes(id)) { if (Array.isArray(doc.walls)) fn(doc); doc.fixes.push(id); }

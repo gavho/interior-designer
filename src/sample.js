@@ -3,7 +3,7 @@
 // SCALE converts them to metres: every labelled room measures true wall-to-wall at 0.0127 m/px (Entertain 412 × 426 px =
 // 17'2" × 17'9"), and the unit's outline at that scale is 985 sq ft against the listed 980.
 import { S, setDoc, newDoc } from './state.js';
-import { uid, readAsDataURL } from './util.js';
+import { uid, readAsDataURL, rot, add } from './util.js';
 import { makeItem } from './ops.js';
 
 export const SCALE = 0.0127;
@@ -73,6 +73,7 @@ export function buildSample(mine = false) {
   put('box', 113.5, 635, 0, { w: 0.64, d: 0.82, h: 2.6, name: 'Mechanical chase', color: '#cfccc6', locked: true });
   put('box', 428.5, 637, 0, { w: 0.7, d: 0.76, h: 2.6, name: 'Shaft', color: '#8f8c86', locked: true });
   for (const it of roomDetails()) doc.items.push(it);
+  doc.elec = { points: ledgeOutlets(doc.items), cables: [] };
   if (mine) { furnishMine(put); doc.trace = { assetId: 'trace', x: 0, y: 0, scale: SCALE, opacity: 0.45, visible: false }; return doc; }
   // living
   put('rug', 205, 262, 90, { w: 2.74, d: 1.83 }); put('sofa3', 122, 262, 270); put('coffee', 212, 262, 90); put('tvstand', 289, 248, 90); put('tv', 302, 248, 90);
@@ -111,6 +112,19 @@ export function roomDetails() {
     it('window_ledge', 23, 742, 270, { w: m(279), d: 0.178, name: 'Window ledge' }),                                             // bedroom 2
     it('access_panel', 586, 61.5, 90, { name: 'Access panel (enclosure)' }),
   ];
+}
+
+/** Duplex outlets on the window ledges (every ~6 ft, as in the photos), as electrical points. */
+export function ledgeOutlets(items) {
+  const out = [];
+  for (const it of items.filter(i => i.type === 'window_ledge')) {
+    const n = Math.max(1, Math.round(it.w / 1.8));
+    for (let i = 0; i < n; i++) {
+      const p = add(it, rot({ x: -it.w / 2 + (it.w / n) * (i + 0.5), y: it.d / 2 + 0.004 }, it.rot));
+      out.push({ id: uid('ep'), kind: 'outlet', x: +p.x.toFixed(4), y: +p.y.toFixed(4), z: 0.3, rot: it.rot, label: 'Window ledge outlet' });
+    }
+  }
+  return out;
 }
 
 function furnishMine(put) {
