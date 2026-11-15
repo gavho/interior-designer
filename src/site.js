@@ -46,8 +46,8 @@ export function cornerSite(s, bounds, bearing) {
   const far = pts => pts.reduce((m, p) => (p.x * d.x + p.y * d.y > m.x * d.x + m.y * d.y ? p : m));
   const target = far(own.pts.map(([la, lo]) => toPlan(la, lo, s, c)));
   const corner = far([{ x: bounds.x0, y: bounds.y0 }, { x: bounds.x1, y: bounds.y0 }, { x: bounds.x0, y: bounds.y1 }, { x: bounds.x1, y: bounds.y1 }]);
-  // moving the site by −(target − corner) in plan space slides the building so its corner meets the plan's
-  return toMap({ x: c.x + corner.x - target.x, y: c.y + corner.y - target.y }, s, c);
+  // moving the site by (target − corner) slides the building the other way, so its corner meets the plan's
+  return toMap({ x: c.x + target.x - corner.x, y: c.y + target.y - corner.y }, s, c);
 }
 
 /** Buildings within `radius` m as { pts: [[lat, lon]…], h } — the one at the site itself (your own building) marked `own`. */

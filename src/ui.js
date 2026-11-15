@@ -829,6 +829,7 @@ async function siteDialog() {
     row('Time zone', selectInput(zones, st.tz, v => save({ tz: v }))),
     h('div.sitenorth', null, cv, h('div', null, row('North', north, nlab), h('p.hint', null, 'Which way the top of the plan faces. 0° = up is north, 90° = up is east.'))),
     row('Floor', numInput(st.floor, v => save({ floor: Math.max(1, Math.round(v)) }), { min: 1, max: 200 })),
+    row('Storeys in your building', numInput(st.storeys || 0, v => save({ storeys: Math.max(0, Math.round(v)) }), { min: 0, max: 200, title: '0 = use OpenStreetMap\'s height' })),
     row('Floor-to-floor height', lenInput(st.floorHeight, v => save({ floorHeight: v }), false)),
     h('p.hint', null, `Floor ${st.floor} puts your floor about ${fmtLen(floorElev(st), units())} above the street.`),
     load, corners, status,

@@ -398,8 +398,8 @@ function syncContext(b, c, R) {
     if (!bd.own) { extrude(pts, 0, bd.h, facade).userData.neighbour = true; continue; }
     // your own building: the floors below the unit always, the ones above with the neighbours; your storey stays open
     if (elev > 0.2) extrude(pts, 0, elev - 0.05, slab);
-    const top = elev + st.floorHeight;
-    if (bd.h > top + 0.5) extrude(pts, top, Math.max(bd.h, top + 1), facade).userData.neighbour = true;
+    const top = elev + st.floorHeight, h = st.storeys ? st.storeys * st.floorHeight : bd.h;
+    if (h > top + 0.5) extrude(pts, top, h, facade).userData.neighbour = true;
   }
   context.traverse(o => { o.updateMatrix(); o.matrixAutoUpdate = false; });
   showContext();
