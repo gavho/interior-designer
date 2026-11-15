@@ -5,7 +5,7 @@ import { Kbd } from './ui.jsx';
 
 const KEYS = [['W A S D', 'Move'], ['Shift', 'Run'], ['C', 'Crouch (fly: down)'], ['N', 'Fly on / off'], ['Space', 'Fly: up'], ['Wheel', 'Speed (Build: next piece)'],
   ['B / E / P', 'Build / Move / Paint'], ['1–9', 'Hotbar slot'], ['R', 'Rotate 15° (Shift 90°)'], ['F', 'Duplicate'], ['X / Del', 'Delete'], ['G', 'Grid snap'],
-  ['T', 'Catalogue / palette'], ['O', 'Settings'], ['Tab', 'Hide HUD'], ['F1', 'Photo mode'], ['F3', 'Performance'], ['Ctrl+Z / Y', 'Undo / redo'], ['Esc', 'Free mouse, then leave']];
+  ['T', 'Catalogue / palette'], ['[ / ]', 'Time −/+ 30 min'], ['O', 'Settings'], ['Tab', 'Hide HUD'], ['F1', 'Photo mode'], ['F3', 'Performance'], ['Ctrl+Z / Y', 'Undo / redo'], ['Esc', 'Free mouse, then leave']];
 
 // outside the component, so inputs keep their identity (and a slider drag) across re-renders
 const Row = ({ label, children }) => <label className="flex items-center justify-between gap-4 py-1.5 text-[12.5px] text-white/85"><span>{label}</span><span className="flex items-center gap-2">{children}</span></label>;

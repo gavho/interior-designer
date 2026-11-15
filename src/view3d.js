@@ -10,13 +10,16 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { S, on, emit, touch, commit, select, isSel, find } from './state.js';
-import { rad, lerp, clamp, dot, sub, mul, add } from './util.js';
+import { rad, lerp, clamp, dot, sub, mul, add, pointInPoly } from './util.js';
 import { partsFor, resolveColor, getDef } from './catalog.js';
 import { getFloor, floorCanvas, getFinish, finishCanvas, grainCanvas } from './materials.js';
 import { sits, surfaceUnder, riders } from './ops.js';
 import { contentBounds } from './editor2d.js';
 import { POINT_KINDS, CABLE_KINDS, cable3d } from './electrical.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { Sky } from 'three/addons/objects/Sky.js';
+import { sunPosition, zonedInstant, daylight } from './sun.js';
+import { site, floorElev, bearingDir, toPlan } from './site.js';
 import { walk, walkStep, look, standAt } from './walk.js';
 import { sb, initSandbox, sandboxFrame, primary, secondary, setSlot } from './sandbox.js';
 
@@ -24,6 +27,8 @@ let renderer, scene, camera, controls, pane, sun, hemi, structure, itemsGroup, h
 let wallMode = 'auto', structSig = '', wallObjs = [], needFit = true;
 let quality = 'standard', composer = null, pt = null, ptActive = false, ptEnv = null, ptSaved = null;
 const itemObjs = new Map();
+let sky = null, context = null, contextSig = '', sunInfo = { az: 180, el: 45 };
+const today = new Date(), sunWhen = { date: `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`, minutes: 14 * 60 };
 let lastFrame = 0, wallVisSig = '', perfEl = null, dynScale = 1, slowFrames = 0, fastFrames = 0;
 const _dir = new THREE.Vector3();
 /** On-screen walk controls (touch): hold a movement key down or let it go. */
@@ -361,24 +366,60 @@ function syncStructure() {
     group.userData.wallId = w.id; structure.add(group);
   }
   const R = Math.max(b.x1 - b.x0, b.y1 - b.y0, 4);
-  ground.position.set(c.x, -0.02, c.y); ground.scale.setScalar(R * 12);
+  syncContext(b, c, R);
   structure.traverse(o => { o.updateMatrix(); o.matrixAutoUpdate = false; }); // walls never move between syncs
   structure.matrixAutoUpdate = true;
-  Object.assign(sun.userData, { c, R }); placeSun(sun.userData.t ?? 0.42);
+  Object.assign(sun.userData, { c, R }); placeSun();
 }
 
-function placeSun(t) {
+// The street, your own building below the unit, and the neighbours (from OpenStreetMap, saved in the project).
+function syncContext(b, c, R) {
+  const st = site(), elev = floorElev(st), sig = JSON.stringify([st, c.x.toFixed(2), c.y.toFixed(2)]);
+  const reach = st.buildings?.length ? 700 : R * 12;
+  ground.position.set(c.x, -elev - 0.02, c.y); ground.scale.setScalar(reach);
+  if (sig === contextSig) return;
+  contextSig = sig;
+  if (context) { scene.remove(context); context.traverse(o => o.geometry?.dispose()); }
+  context = new THREE.Group(); scene.add(context);
+  const facade = mat('#b9bcc0'), slab = mat('#9fa3a8');
+  if (elev > 0.2) { // the floors below yours: a plain block under the plan
+    const m = box(b.x1 - b.x0 + 0.4, elev - 0.05, b.y1 - b.y0 + 0.4, c.x, -elev / 2 - 0.05, c.y, slab);
+    context.add(m);
+  }
+  for (const bd of st.buildings || []) {
+    const pts = bd.pts.map(([la, lo]) => toPlan(la, lo, st, c));
+    if (pts.length < 3) continue;
+    const shape = new THREE.Shape(pts.map(q => new THREE.Vector2(q.x, -q.y)));
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: bd.h, bevelEnabled: false }).rotateX(-Math.PI / 2);
+    const m = new THREE.Mesh(geo, facade); m.position.y = -elev; m.castShadow = m.receiveShadow = true;
+    m.userData.neighbour = true;
+    context.add(m);
+  }
+  context.traverse(o => { o.updateMatrix(); o.matrixAutoUpdate = false; });
+  showContext();
+}
+
+function placeSun() {
   const { c, R } = sun.userData.c ? sun.userData : { c: { x: 0, y: 0 }, R: 10 };
-  sun.userData.t = t;
-  const az = rad(lerp(-110, 110, t)), el = rad(12 + Math.sin(Math.PI * t) * 58);
-  sun.position.set(c.x + Math.sin(az) * Math.cos(el) * R * 2, Math.sin(el) * R * 2, c.y - Math.cos(az) * Math.cos(el) * R * 2);
+  const st = site(), p = sunPosition(zonedInstant(sunWhen.date, sunWhen.minutes, st.tz), st.lat, st.lon);
+  sunInfo = p;
+  const dir = bearingDir(p.az, st.north), el = rad(Math.max(p.el, 1)), far = st.buildings?.length ? Math.max(R * 2, 400) : R * 2;
+  sun.position.set(c.x + dir.x * Math.cos(el) * far, Math.sin(el) * far, c.y + dir.y * Math.cos(el) * far);
   sun.target.position.set(c.x, 0, c.y); sun.target.updateMatrixWorld();
-  const warm = 1 - Math.sin(Math.PI * t);
-  sun.color.setRGB(1, 0.96 - warm * 0.22, 0.88 - warm * 0.42); sun.intensity = 1.3 + Math.sin(Math.PI * t) * 1.5;
-  hemi.intensity = 0.55 + Math.sin(Math.PI * t) * 0.55;
-  const sc = sun.shadow.camera; sc.left = sc.bottom = -R * 1.1; sc.right = sc.top = R * 1.1; sc.near = 0.5; sc.far = R * 6; sc.updateProjectionMatrix();
-  scene.background.setRGB(0.93 - warm * 0.05, 0.95 - warm * 0.12, 0.97 - warm * 0.2);
-  shadowsDirty();
+  const day = clamp(p.el / 8, 0, 1), high = clamp(p.el / 45, 0, 1), warm = 1 - clamp(p.el / 25, 0, 1);
+  sun.color.setRGB(1, 0.96 - warm * 0.26, 0.88 - warm * 0.48); sun.intensity = day * (1.2 + high * 1.7);
+  hemi.intensity = 0.1 + clamp((p.el + 6) / 14, 0, 1) * (0.5 + high * 0.55);
+  scene.environmentIntensity = 0.06 + day * 0.24;
+  const sc = sun.shadow.camera; sc.left = sc.bottom = -R * 1.1; sc.right = sc.top = R * 1.1; sc.near = 0.5; sc.far = far + R * 3; sc.updateProjectionMatrix();
+  sun.shadow.bias = -0.0004 * (R * 6) / sc.far; // the same bias in metres however far the light sits
+  if (sky) {
+    const e = rad(p.el), u = sky.material.uniforms;
+    u.sunPosition.value.set(dir.x * Math.cos(e), Math.sin(e), dir.y * Math.cos(e));
+    sky.position.set(c.x, 0, c.y);
+  }
+  const night = 1 - clamp((p.el + 8) / 14, 0, 1);
+  scene.background.setRGB(lerp(0.93 - warm * 0.05, 0.05, night), lerp(0.95 - warm * 0.12, 0.07, night), lerp(0.97 - warm * 0.2, 0.12, night));
+  shadowsDirty(); emit('sun', { ...p, ...sunWhen });
 }
 
 function syncSelection() {
@@ -412,10 +453,64 @@ export function setWalk(v) {
     const dir = camera.getWorldDirection(new THREE.Vector3()); controls.target.copy(camera.position).addScaledVector(dir, 3); camera.position.y = Math.max(camera.position.y, 1.6); controls.update();
   }
   camera.updateProjectionMatrix();
+  showContext();
   emit('walk');
 }
+/** Neighbouring buildings: on view while walking (or when switched on); they cast their shadows either way. */
+// hidden = drawn with an invisible material, so they still cast shadows (the shadow pass skips what the camera's layers skip)
+const unseen = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
+export function showContext(v = S.prefs.showContext) { const on = S.walk || v; context?.children.forEach(m => { if (m.userData.neighbour) m.material = on ? mat('#b9bcc0') : unseen; }); }
 export const setWallMode = m => { wallMode = m; };
-export const setSun = t => placeSun(t);
+
+// ---- sun-hours map: hours of direct sun on each spot of floor over the chosen day (walls, furniture and neighbours block it; glass doesn't) ----
+let sunMap = null;
+export async function sunHours(onProgress = () => {}) {
+  clearSunHours();
+  const st = site(), { rise, set } = daylight(sunWhen.date, st.tz, st.lat, st.lon);
+  if (rise == null || set == null) return null;
+  const b = contentBounds(), cell = 0.25, nx = Math.ceil((b.x1 - b.x0) / cell), ny = Math.ceil((b.y1 - b.y0) / cell);
+  const dirs = [];
+  for (let m = rise + 15; m < set; m += 30) {
+    const p = sunPosition(zonedInstant(sunWhen.date, m, st.tz), st.lat, st.lon), d = bearingDir(p.az, st.north), e = rad(p.el);
+    if (p.el > 0) dirs.push(new THREE.Vector3(d.x * Math.cos(e), Math.sin(e), d.y * Math.cos(e)));
+  }
+  const blockers = [structure, itemsGroup, ...(context ? [context] : [])], rc = new THREE.Raycaster(), o = new THREE.Vector3();
+  const blocks = h => !h.object.material?.transparent; // glass lets the sun through (hidden neighbours' material isn't transparent: they still block)
+  scene.updateMatrixWorld(true);
+  const hours = new Float32Array(nx * ny).fill(-1);
+  for (let j = 0; j < ny; j++) {
+    for (let i = 0; i < nx; i++) {
+      const x = b.x0 + (i + 0.5) * cell, y = b.y0 + (j + 0.5) * cell;
+      if (!S.rooms.some(r => pointInPoly({ x, y }, r.poly))) continue;
+      let lit = 0;
+      for (const d of dirs) { rc.set(o.set(x, 0.05, y), d); rc.far = 600; if (!rc.intersectObjects(blockers, true).some(blocks)) lit++; }
+      hours[j * nx + i] = lit * 0.5;
+    }
+    if (j % 4 === 0) { onProgress(j / ny); await new Promise(r => setTimeout(r)); }
+  }
+  // paint it: deep blue (no sun) through sky blue and amber to pale yellow (6 h or more)
+  const cv = document.createElement('canvas'); cv.width = nx; cv.height = ny;
+  const g = cv.getContext('2d'), img = g.createImageData(nx, ny), ramp = [[40, 70, 160], [90, 170, 220], [250, 200, 70], [255, 240, 160]];
+  for (let k = 0; k < hours.length; k++) {
+    if (hours[k] < 0) continue;
+    const t = Math.min(1, hours[k] / 6) * (ramp.length - 1), a = Math.min(Math.floor(t), ramp.length - 2), f = t - a;
+    for (let c = 0; c < 3; c++) img.data[k * 4 + c] = ramp[a][c] + (ramp[a + 1][c] - ramp[a][c]) * f;
+    img.data[k * 4 + 3] = 170;
+  }
+  g.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+  sunMap = new THREE.Mesh(new THREE.PlaneGeometry(nx * cell, ny * cell).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
+  sunMap.position.set(b.x0 + (nx * cell) / 2, 0.012, b.y0 + (ny * cell) / 2); sunMap.renderOrder = 2; sunMap.raycast = () => {};
+  scene.add(sunMap);
+  let max = 0, sum = 0, n = 0; for (const v of hours) if (v >= 0) { max = Math.max(max, v); sum += v; n++; }
+  return { max, avg: n ? sum / n : 0, day: (set - rise) / 60 };
+}
+export function clearSunHours() { if (sunMap) { scene.remove(sunMap); sunMap.geometry.dispose(); sunMap.material.map.dispose(); sunMap = null; } }
+
+/** Sun by date ('YYYY-MM-DD') and local time at the site (minutes after midnight). */
+export function setSunTime(patch) { Object.assign(sunWhen, patch); placeSun(); }
+export const getSunTime = () => ({ ...sunWhen, ...sunInfo });
+export const setSky = v => { if (sky) sky.visible = v; };
 export const setShadows = v => { renderer.shadowMap.enabled = v; sun.castShadow = v; mats.forEach(m => (m.needsUpdate = true)); floorTex.forEach(m => (m.needsUpdate = true)); shadowsDirty(); };
 /** Where the walker stands and faces (plan coordinates; yaw 0 looks toward −y on the plan). */
 export const playerPose = () => ({ x: camera.position.x, y: camera.position.z, yaw: walk.yaw, fly: walk.fly, speed: walk.speed });
@@ -496,7 +591,7 @@ export async function startRender() {
   setWalk(false);
   ptSaved = { env: scene.environment, bg: scene.background, k: scene.environmentIntensity };
   scene.environment = ptEnv; scene.background = ptEnv; scene.environmentIntensity = 0.7;
-  helpers.visible = false; ground.visible = true;
+  helpers.visible = false; ground.visible = true; if (sky) sky.visible = false; // the path tracer has its own sky
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); resize();
   pt.setScene(scene, camera);
   ptActive = true; emit('render');
@@ -505,7 +600,7 @@ export function stopRender() {
   if (!ptActive) return;
   ptActive = false;
   scene.environment = ptSaved.env; scene.background = ptSaved.bg; scene.environmentIntensity = ptSaved.k;
-  helpers.visible = true; setQuality(quality); emit('render');
+  helpers.visible = true; if (sky) sky.visible = S.prefs.sky !== false; setQuality(quality); emit('render');
 }
 export const renderInfo = () => ({ active: ptActive, samples: pt ? Math.floor(pt.samples) : 0, compiling: !!pt?.isCompiling });
 
@@ -533,21 +628,26 @@ export function init3d(el) {
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.9;
   pane.prepend(renderer.domElement);
   scene = new THREE.Scene(); scene.background = new THREE.Color('#eef2f6');
-  camera = new THREE.PerspectiveCamera(50, 1, 0.02, 500);
+  camera = new THREE.PerspectiveCamera(50, 1, 0.02, 3000);
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = false; controls.zoomToCursor = true; controls.rotateSpeed = 0.9; // no inertia: the view stops when the mouse stops
   controls.addEventListener('change', () => { if (ptActive) pt.updateCamera(); });
-  controls.maxPolarAngle = Math.PI / 2 - 0.02; controls.minDistance = 0.08; controls.maxDistance = 120; // close enough to inspect a keyboard
+  controls.maxPolarAngle = Math.PI / 2 - 0.02; controls.minDistance = 0.08; controls.maxDistance = 600; // close enough to inspect a keyboard
   hemi = new THREE.HemisphereLight(0xffffff, 0xcfc8bb, 1.0);
   sun = new THREE.DirectionalLight(0xfff3dc, 2.4); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
   ground = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#dfe4e8', roughness: 1 }));
   ground.receiveShadow = true;
   structure = new THREE.Group(); itemsGroup = new THREE.Group(); helpers = new THREE.Group();
   scene.add(hemi, sun, sun.target, new THREE.AmbientLight(0xffffff, 0.15), ground, structure, itemsGroup, helpers);
+  sky = new Sky(); sky.scale.setScalar(2400); sky.visible = S.prefs.sky !== false;
+  Object.assign(sky.material.uniforms, {}); sky.material.uniforms.turbidity.value = 3; sky.material.uniforms.rayleigh.value = 1.1;
+  sky.material.uniforms.mieCoefficient.value = 0.004; sky.material.uniforms.mieDirectionalG.value = 0.8;
+  scene.add(sky);
   scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture; // soft reflections on metal, glass and tile
   scene.environmentIntensity = 0.3;
 
-  const sync = () => { if (ptActive) stopRender(); if (!pane.offsetWidth) { structSig = ''; return; } syncStructure(); syncItems(); syncElec(); };
+  const sync = () => { if (ptActive) stopRender(); clearSunHours(); // a changed plan makes the map stale
+    if (!pane.offsetWidth) { structSig = ''; return; } syncStructure(); syncItems(); syncElec(); };
   on('doc', sync); on('sel', () => { syncSelection(); if (pane.offsetWidth) syncElec(); });
   on('load', () => { needFit = true; if (pane.offsetWidth) { sync(); needFit = false; setCamera('iso'); } });
   on('prefs', () => setTimeout(() => { resize(); if (!ptActive) sync(); }, 0));

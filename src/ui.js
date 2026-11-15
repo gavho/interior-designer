@@ -749,11 +749,82 @@ function build3dHud() {
   $('hud3d').replaceChildren(
     h('div.hudgroup', null, btn('Orbit', () => api3d.setCamera('iso'), { title: 'Reset to an overview' }), btn('Top', () => api3d.setCamera('top')), btn('Front', () => api3d.setCamera('front')), walkB),
     h('div.hudgroup', null, h('span', null, 'Walls'), selectInput([['auto', 'Cut-away'], ['full', 'All'], ['none', 'Hidden']], 'auto', v => api3d.setWallMode(v)),
-      h('span', null, 'Sun'), h('input', { type: 'range', min: 0.02, max: 0.98, step: 0.01, value: 0.42, title: 'Time of day', oninput: e => api3d.setSun(+e.target.value) }),
-      check('Shadows', true, v => api3d.setShadows(v))),
+      check('Shadows', true, v => api3d.setShadows(v)), check('Neighbours', S.prefs.showContext, v => { setPref('showContext', v); api3d.showContext(v); })),
+    sunBar(),
     h('div.hudgroup', null, h('span', null, 'Quality'), selectInput([['standard', 'Standard'], ['high', 'High (ambient occlusion)']], 'standard', v => api3d.setQuality(v)),
       btn('📷 Photo render', () => { toast('Preparing the render…'); api3d.startRender().catch(() => toast('The photo renderer could not start on this device')); }, { cls: 'primary', title: 'Path-traced render of this view: real light bounces, soft shadows and reflections' })),
     renderBar, pad);
+}
+
+// ---- sun: date, time of day (local time at the site), play a day; the Site dialog places the plan on Earth ----
+const hhmm = m => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(Math.round(m % 60)).padStart(2, '0')}`;
+function sunBar() {
+  const t0 = api3d.getSunTime();
+  const time = h('input', { type: 'range', min: 0, max: 1439, step: 5, value: t0.minutes, title: 'Time of day at the site', oninput: () => { stop(); api3d.setSunTime({ minutes: +time.value }); } });
+  const date = h('input', { type: 'date', value: t0.date, title: 'Date', onchange: () => date.value && api3d.setSunTime({ date: date.value }) });
+  const label = h('b.suntime'), play = btn('▶', () => (timer ? stop() : start()), { title: 'Play the day' });
+  let timer = 0;
+  const start = () => { play.textContent = '❚❚'; let m = +time.value; timer = setInterval(() => { m = (m + 6) % 1440; time.value = m; api3d.setSunTime({ minutes: m }); }, 50); };
+  const stop = () => { clearInterval(timer); timer = 0; play.textContent = '▶'; };
+  on('sun', p => { label.textContent = `${hhmm(p.minutes)} · sun ${p.el > 0 ? `${Math.round(p.el)}° up, ${compass(p.az)}` : 'down'}`; if (+time.value !== p.minutes) time.value = p.minutes; if (date.value !== p.date) date.value = p.date; });
+  setTimeout(() => api3d.setSunTime({}), 0); // fill in the read-out
+  const hoursB = btn('Sun hours', async () => {
+    if (hoursB.classList.contains('on')) { api3d.clearSunHours(); hoursB.classList.remove('on'); return; }
+    hoursB.disabled = true; hoursB.textContent = 'Working…';
+    const r = await api3d.sunHours(f => (hoursB.textContent = `${Math.round(f * 100)}%`));
+    hoursB.disabled = false; hoursB.textContent = 'Sun hours';
+    if (!r) return toast('The sun does not rise on that day here');
+    hoursB.classList.add('on'); toast(`Direct sun on the floor that day: up to ${r.max.toFixed(1)} h (average ${r.avg.toFixed(1)} h of ${r.day.toFixed(1)} h daylight). Blue = none, yellow = 6 h+`, 6000);
+  }, { title: 'Map how many hours of direct sun each spot of floor gets on this date' });
+  on('doc', () => hoursB.classList.remove('on'));
+  return h('div.hudgroup.sunbar', null, h('span', null, 'Sun'), date, time, play, label, hoursB, btn('Site…', siteDialog, { title: 'Address, north and which floor the unit is on' }));
+}
+const compass = az => ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(az / 45) % 8];
+
+async function siteDialog() {
+  const { site, geocode, fetchBuildings, floorElev } = await import('./site.js');
+  const st = site(), save = patch => { S.doc.settings.site = { ...site(), ...patch }; commit(); draw(); };
+  const results = h('div.siteresults'), info = h('p.hint');
+  const q = h('input', { type: 'search', placeholder: 'Search an address or place…', value: st.address || '', onkeydown: e => e.key === 'Enter' && search() });
+  async function search() {
+    results.replaceChildren(h('p.hint', null, 'Searching…'));
+    try {
+      const found = await geocode(q.value);
+      results.replaceChildren(...(found.length ? found.map(f => h('button.siteresult', { onclick: () => { save({ lat: f.lat, lon: f.lon, address: f.name, buildings: null }); lat.value = f.lat.toFixed(5); lon.value = f.lon.toFixed(5); results.replaceChildren(); info.textContent = 'Location set. Load the neighbouring buildings to see their shadows.'; } }, f.name)) : [h('p.hint', null, 'Nothing found.')]));
+    } catch { results.replaceChildren(h('p.hint', null, 'Could not reach OpenStreetMap. Check your connection.')); }
+  }
+  const lat = numInput(st.lat.toFixed(5), v => save({ lat: v, buildings: null }), { step: 0.0001 }), lon = numInput(st.lon.toFixed(5), v => save({ lon: v, buildings: null }), { step: 0.0001 });
+  const zones = (Intl.supportedValuesOf?.('timeZone') || [st.tz]).map(z => [z, z.replace(/_/g, ' ')]);
+  const north = h('input', { type: 'range', min: 0, max: 359, step: 1, value: st.north, oninput: () => { S.doc.settings.site = { ...site(), north: +north.value }; nlab.textContent = `${north.value}°`; draw(); touch(); }, onchange: () => commit() });
+  const nlab = h('b', null, `${st.north}°`);
+  // preview: the plan outline with a north arrow, turned as the slider says
+  const cv = h('canvas', { width: 220, height: 220, style: { width: '110px', height: '110px' } });
+  function draw() {
+    const g = cv.getContext('2d'), b = ed.contentBounds(), s = 180 / Math.max(b.x1 - b.x0, b.y1 - b.y0, 1), n = site().north;
+    g.clearRect(0, 0, 220, 220); g.save(); g.translate(110, 110); g.lineWidth = 3; g.strokeStyle = '#3a3f47';
+    for (const w of S.doc.walls) { g.beginPath(); g.moveTo((w.a.x - (b.x0 + b.x1) / 2) * s, (w.a.y - (b.y0 + b.y1) / 2) * s); g.lineTo((w.b.x - (b.x0 + b.x1) / 2) * s, (w.b.y - (b.y0 + b.y1) / 2) * s); g.stroke(); }
+    g.rotate(-n * Math.PI / 180); g.fillStyle = '#d6453d'; g.beginPath(); g.moveTo(0, -100); g.lineTo(-9, -76); g.lineTo(9, -76); g.closePath(); g.fill();
+    g.font = 'bold 18px system-ui'; g.textAlign = 'center'; g.fillText('N', 0, -58); g.restore();
+  }
+  draw();
+  const status = h('p.hint', null, st.buildings ? `${st.buildings.length} neighbouring buildings loaded.` : 'No neighbouring buildings loaded.');
+  const load = btn('Load neighbouring buildings', async () => {
+    load.disabled = true; status.textContent = 'Asking OpenStreetMap for buildings within 250 m… (this can take up to a minute)';
+    try { const b = await fetchBuildings(site().lat, site().lon); save({ buildings: b }); status.textContent = `${b.length} buildings loaded; they cast shadows on the unit.`; }
+    catch { status.textContent = 'The buildings service did not answer. Try again in a minute.'; }
+    load.disabled = false;
+  });
+  dialog('Site: where the unit is', h('div', null,
+    h('p.hint', null, 'Puts the plan on the map so the sun comes from the right side at the right time, at your floor\'s height, with the neighbours\' shadows. Search, then turn the plan until the red arrow points north.'),
+    h('div.siterow', null, q, btn('Search', search, { cls: 'primary' })), results, info,
+    row('Latitude', lat), row('Longitude', lon),
+    row('Time zone', selectInput(zones, st.tz, v => save({ tz: v }))),
+    h('div.sitenorth', null, cv, h('div', null, row('North', north, nlab), h('p.hint', null, 'Which way the top of the plan faces. 0° = up is north, 90° = up is east.'))),
+    row('Floor', numInput(st.floor, v => save({ floor: Math.max(1, Math.round(v)) }), { min: 1, max: 200 })),
+    row('Floor-to-floor height', lenInput(st.floorHeight, v => save({ floorHeight: v }), false)),
+    h('p.hint', null, `Floor ${st.floor} puts your floor about ${fmtLen(floorElev(st), units())} above the street.`),
+    load, status,
+    h('p.hint', null, 'Map data © OpenStreetMap contributors (ODbL).')), [{ label: 'Done', primary: true }]);
 }
 
 function buildStatus() {

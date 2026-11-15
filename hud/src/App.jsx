@@ -7,6 +7,7 @@ import Minimap from './Minimap.jsx';
 import Catalog from './Catalog.jsx';
 import Paint from './Paint.jsx';
 import Settings from './Settings.jsx';
+import Sun from './Sun.jsx';
 
 export default function App({ I, pane }) {
   const [, redraw] = useReducer(x => x + 1, 0);
@@ -41,6 +42,7 @@ export default function App({ I, pane }) {
       </div>
 
       <div className="absolute right-3 top-3"><Minimap I={I} locked={locked} /></div>
+      <div className="absolute right-3 top-[204px]"><Sun I={I} /></div>
 
       <Readout I={I} sb={sb} />
 

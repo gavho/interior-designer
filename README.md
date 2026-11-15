@@ -150,7 +150,11 @@ elevation views, circuits and auto-routed cables).
 - Shopping list with prices, links and CSV export.
 
 **View and share**
-- Split 2D / 3D, orbit, top and front cameras, cut-away walls, time-of-day sun, shadows and a first-person walk mode.
+- Split 2D / 3D, orbit, top and front cameras, cut-away walls, shadows and a first-person walk mode.
+- The real sun: **Site…** (next to the date and time in 3D) finds your address on OpenStreetMap, turns the plan to north
+  and sets your floor, so light comes in from the right side at any date and time (▶ plays a day). *Load neighbouring
+  buildings* adds the blocks around you (they shade the unit; tick **Neighbours** to see them outside walk mode).
+  **Sun hours** colours the floor by hours of direct sun that day: blue none, yellow 6 h or more.
 - High-quality mode (ambient occlusion, sharper shadows) and a path-traced **Photo render** of the current view
   ([three-gpu-pathtracer](https://github.com/gkjohnson/three-gpu-pathtracer)) that can be saved as an image.
 - Clicking a piece selects it and shows a toolbar (move, rotate, centre, duplicate, delete); it only moves on purpose.
