@@ -119,6 +119,53 @@ const tubeTable = (w, d, h, it = {}) => {
   if (it.led) out.push(bx(0, 0.004, 0, w - 0.09, 0.012, d - 0.07, 'led'));
   return out;
 };
+// Modular sectional: pieces on a grid (it.modules = [{ x, y, t: 'seat' | 'corner' | 'ottoman', r: 0-3 }], r = which way the seat
+// faces: 0 front, 1 left, 2 back, 3 right). Each piece has its real size; a seat gains an arm on any open side (when arms are on),
+// and grid columns / rows take the size of the pieces in them, so the footprint matches the real set.
+export const MODULE_TYPES = { seat: 'Seat (armless)', corner: 'Corner seat', ottoman: 'Ottoman' };
+export function moduleBounds(mods) {
+  const xs = mods.map(m => m.x), ys = mods.map(m => m.y);
+  return mods.length ? { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) } : { x0: 0, x1: 0, y0: 0, y1: 0 };
+}
+const rotPart = (p, r) => r === 1 ? { ...p, x: -p.z, z: p.x, w: p.d, d: p.w } : r === 2 ? { ...p, x: -p.x, z: -p.z } : r === 3 ? { ...p, x: p.z, z: -p.x, w: p.d, d: p.w } : p;
+const sideDir = r => [[1, 0], [0, 1], [-1, 0], [0, -1]][r]; // the module's local +x in grid steps
+const MOD_DEFAULT = { seat: [0.889, 1.067], corner: [1.067, 1.067], ottoman: [1.06, 0.787], arm: 0.152 };
+/** Natural layout of the pieces: overall size and, per piece, its centre (from the footprint centre), size and arms. */
+export function moduleLayout(it) {
+  const mods = it.modules || [], S = getDef(it.type).moduleSizes || MOD_DEFAULT, B = moduleBounds(mods), at = (x, y) => mods.find(m => m.x === x && m.y === y);
+  const info = mods.map(m => {
+    const [bw, bd] = S[m.t] || S.seat, arms = [];
+    if (m.t !== 'ottoman' && it.arms !== false) for (const s of m.t === 'corner' ? [1] : [-1, 1]) { const [dx, dy] = sideDir(m.r); if (!at(m.x + s * dx, m.y + s * dy)) arms.push(s); }
+    const lw = bw + arms.length * S.arm, odd = m.r % 2;
+    return { m, bw, bd, arms, lw, ld: bd, ex: odd ? bd : lw, ez: odd ? lw : bd };
+  });
+  const cols = [], rows = [];
+  const size = (list, k) => Math.max(0, ...list.filter(i => i.m.t !== 'ottoman').map(i => i[k])) || Math.max(0, ...list.map(i => i[k])); // ottomans may overhang a seat column
+  for (let x = B.x0; x <= B.x1; x++) cols.push(size(info.filter(i => i.m.x === x), 'ex') || S.seat[0]);
+  for (let y = B.y0; y <= B.y1; y++) rows.push(size(info.filter(i => i.m.y === y), 'ez') || S.ottoman[1]);
+  const W = cols.reduce((a, b) => a + b, 0), D = rows.reduce((a, b) => a + b, 0);
+  const cx = x => cols.slice(0, x - B.x0).reduce((a, b) => a + b, 0) + cols[x - B.x0] / 2 - W / 2, cz = y => rows.slice(0, y - B.y0).reduce((a, b) => a + b, 0) + rows[y - B.y0] / 2 - D / 2;
+  for (const i of info) { i.cx = cx(i.m.x); i.cz = cz(i.m.y); }
+  return { W, D, info, S };
+}
+const modularSofa = (w, d, h, it = {}) => {
+  const L = moduleLayout(it), sx = w / L.W, sz = d / L.D, sh = it.seatH || 0.457, cush = 0.159, back = 1.067 - 0.75, armH = 0.597, base = 0.03, out = [];
+  for (const i of L.info) {
+    const { m, bw, bd, arms, lw } = i, parts = [];
+    parts.push(...[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([a, b]) => cy(a * (lw / 2 - 0.06), 0, b * (bd / 2 - 0.06), 0.035, base, 'dark')));
+    if (m.t === 'ottoman') parts.push(rb(0, base, 0, bw - 0.01, sh - cush - base, bd - 0.01, 'a', 0.05), rb(0, sh - cush - 0.01, 0, bw - 0.015, cush + 0.01, bd - 0.015, 'a+', 0.07));
+    else {
+      const sxo = (arms.includes(-1) ? 1 : 0) * L.S.arm / 2 - (arms.includes(1) ? 1 : 0) * L.S.arm / 2; // seat shifts away from its arms
+      parts.push(rb(sxo, base, 0, bw - 0.005, sh - cush - base, bd - 0.01, 'a', 0.05), rb(sxo, sh - cush - 0.01, back / 2 + 0.005, bw - 0.02, cush + 0.01, bd - back - 0.02, 'a+', 0.07),
+        rb(sxo, base, -bd / 2 + back * 0.45, bw - 0.005, h - base, back * 0.9, 'a', 0.08), { ...rb(sxo, sh, -bd / 2 + back * 0.82, bw - 0.05, 0.476, 0.2, 'a+', 0.09), rx: -0.12 });
+      if (m.t === 'corner') parts.push(rb(-bw / 2 + back * 0.45 + sxo, base, 0, back * 0.9, h - base, bd - 0.01, 'a', 0.08));
+      parts.push({ ...rb(sxo + (m.x % 2 ? 0.08 : -0.08), sh + 0.02, -bd / 2 + back + 0.08, 0.4, 0.4, 0.12, 'b', 0.06), rx: -0.25 }); // throw pillow
+      for (const s of arms) parts.push(rb(s * (lw / 2 - L.S.arm / 2), base, 0.0, L.S.arm, armH - base, bd - 0.01, 'a', 0.06));
+    }
+    for (const p of parts) { const q = rotPart(p, m.r); out.push({ ...q, x: (q.x + i.cx) * sx, z: (q.z + i.cz) * sz, w: q.w * sx, d: q.d * sz }); }
+  }
+  return out;
+};
 // Desk with a two-tone top (wood ends, black centre panel) on black U-frame legs.
 const uFrameDesk = (w, d, h) => {
   const tt = 0.025, lg = 0.05, top = h - tt, out = [bx(-w / 2 + w / 8, top, 0, w / 4, tt, d, 'a'), bx(w / 2 - w / 8, top, 0, w / 4, tt, d, 'a'), bx(0, top, 0, w / 2, tt, d, '#1d1d1f')];
@@ -276,6 +323,11 @@ const DEFS = [
   { id: 'tube_coffee', name: 'Modern rounded coffee table with open shelves', cat: 'My picks', w: 47.2 * IN, d: 18.9 * IN, h: 18.3 * IN, color: '#5b3f2d', mat: 'wood', build: tubeTable,
     colors: [['Walnut brown', '#5b3f2d']],
     note: 'Listed size: 47.2" L × 18.9" W × 18.3" H; 15.7" body on a 2.6" recessed base; open cubbies 13.4" high, the smaller one 21.9" wide. Holds 100 lb on the top and 100 lb on the shelf. Has 16-colour LED lights under the base (tick LED lights).' },
+  { id: 'lr_modular', name: 'Latitude Run 155.7" 6-piece modular chenille sectional', cat: 'My picks', w: 152 * IN, d: 73.25 * IN, h: 33.5 * IN, color: '#d6c9b3', color2: '#cdbfa7', mat: 'fabric', modular: true,
+    moduleSizes: { seat: [35 * IN, 42 * IN], corner: [42 * IN, 42 * IN], ottoman: [41.75 * IN, 31.25 * IN], arm: 6 * IN }, build: modularSofa,
+    url: 'https://www.wayfair.com/furniture/pdp/latitude-run-1557-w-6-piece-modular-chenille-sectional-w112367038.html?piid=350313746',
+    colors: [['Beige chenille', '#d6c9b3'], ['Gray chenille', '#9a9894'], ['Green chenille', '#6f7a62'], ['Camel chenille', '#b98b5e'], ['Dark gray chenille', '#55565a'], ['Black chenille', '#232325']],
+    note: 'From the dimension sheet: 152" W × 73.25" D × 33.5" H as a U. Arm seats 41" (35" seat + 6" arm) × 42" deep, armless seats 35" × 42", ottomans 41.75" × 31"; seat 18" high with 6.25" cushions, arms 23.5", inside seat depth 29.5". Rearrange the pieces below; arms appear on open ends. Swatch colours are approximate.' },
   { id: 'tribesigns_desk', name: 'Tribesigns 63" computer desk', cat: 'My picks', w: 63 * IN, d: 31.5 * IN, h: 29.53 * IN, color: '#7a4e2d', color2: '#1b1b1d', build: uFrameDesk,
     colors: [['Rustic brown / black', '#7a4e2d']],
     note: 'Listed size: 63" × 31.5" × 29.53" H; two-tone top (15.75" wood ends, 31.5" black centre), 1.97" square black metal legs.' },

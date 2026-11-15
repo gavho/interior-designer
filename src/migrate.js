@@ -2,6 +2,7 @@
 import { uid } from './util.js';
 import { buildSample, roomDetails, ledgeOutlets, SCALE as NEW_SCALE } from './sample.js';
 import { makeItem } from './ops.js';
+import { moduleLayout } from './catalog.js';
 
 const S = 0.0128, P = (x, y) => ({ x: +(x * S).toFixed(4), y: +(y * S).toFixed(4) });
 const near = (a, b) => Math.abs(a.x - b.x) < 0.02 && Math.abs(a.y - b.y) < 0.02;
@@ -82,7 +83,12 @@ function electrical(doc) {
   if (!doc.elec.points.length) doc.elec.points.push(...ledgeOutlets(doc.items || []));
 }
 
-const FIXES = [['nook1', bedroomNook], ['layout2', retrace], ['details1', details], ['curtain1', curtain], ['baldoor1', balconyDoor], ['kitchen2', kitchen], ['elec1', electrical]];
+/** The modular sectional now uses the real piece sizes from the dimension sheet. */
+function modularSizes(doc) {
+  for (const it of doc.items || []) if (it.type === 'lr_modular' && it.modules) { const L = moduleLayout(it); it.w = L.W; it.d = L.D; it.h = 33.5 * 0.0254; }
+}
+
+const FIXES = [['nook1', bedroomNook], ['layout2', retrace], ['details1', details], ['curtain1', curtain], ['baldoor1', balconyDoor], ['kitchen2', kitchen], ['elec1', electrical], ['modsize1', modularSizes]];
 export function migrate(doc) {
   doc.fixes = doc.fixes || [];
   for (const [id, fn] of FIXES) if (!doc.fixes.includes(id)) { if (Array.isArray(doc.walls)) fn(doc); doc.fixes.push(id); }
