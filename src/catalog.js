@@ -136,6 +136,12 @@ const mediaStand = (w, d, h) => {
   for (const sx of [-1, 1]) out.push(bx(sx * (w / 2 - cw / 2), lg + 0.015, d / 2 - 0.004, cw - 0.025, h - lg - 0.045, 0.012, 'b'), bx(sx * (w / 2 - cw + 0.04), lg + (h - lg) / 2 - 0.04, d / 2 + 0.008, 0.012, 0.08, 0.015, 'metal'));
   return out;
 };
+// where the arc lamp's shade hangs: its top (for the model), or the bulb inside it (for the light)
+function arcShade(w, d, h, top) {
+  const bxp = -w / 2 + d / 2, ph = h * 0.62, R = Math.min(w - d / 2 - 0.15, h - ph - 0.12);
+  const sx = bxp + R - R * Math.cos(Math.PI * 0.62), sy = ph + R * Math.sin(Math.PI * 0.62) * 0.9;
+  return [[sx, top ? sy : sy - 0.24, 0]];
+}
 // Arc floor lamp: weighted base at one end, upright pole (wood lower section), arc reaching over to a dome shade at the other end.
 const arcLamp = (w, d, h) => {
   const bxp = -w / 2 + d / 2, ph = h * 0.62, R = Math.min(w - d / 2 - 0.15, h - ph - 0.12), n = 14, out = [cy(bxp, 0, 0, d * 0.85, 0.05, 'b'), cy(bxp, 0.05, 0, 0.035, ph * 0.45, 'a'), cy(bxp, 0.05 + ph * 0.45, 0, 0.025, ph * 0.55 - 0.05, 'b')];
@@ -143,8 +149,8 @@ const arcLamp = (w, d, h) => {
     const a0 = (i / n) * Math.PI * 0.62, a1 = ((i + 1) / n) * Math.PI * 0.62, x0 = bxp + R - R * Math.cos(a0), y0 = ph + R * Math.sin(a0) * 0.9, x1 = bxp + R - R * Math.cos(a1), y1 = ph + R * Math.sin(a1) * 0.9;
     out.push(stalk(x0, y0, 0, 0.022, Math.hypot(x1 - x0, y1 - y0) + 0.004, 'b', Math.atan2(-(x1 - x0), y1 - y0)));
   }
-  const sx = bxp + R - R * Math.cos(Math.PI * 0.62), sy = ph + R * Math.sin(Math.PI * 0.62) * 0.9;
-  out.push(stalk(sx, sy - 0.12, 0, 0.02, 0.12, 'b'), cy(sx, sy - 0.32, 0, Math.min(d, 0.4), 0.22, 'b', { t: 0.35 }), cy(sx, sy - 0.33, 0, Math.min(d, 0.4) * 0.9, 0.01, 'led'));
+  const [[sx, sy]] = arcShade(w, d, h, true);
+  out.push(stalk(sx, sy - 0.12, 0, 0.02, 0.12, 'b'), cy(sx, sy - 0.32, 0, Math.min(d, 0.4), 0.22, 'b', { t: 0.35 }), cy(sx, sy - 0.33, 0, Math.min(d, 0.4) * 0.9, 0.01, 'glow'));
   return out;
 };
 // Three framed canvases hung side by side (each w/3 minus gaps): black wood frames, dark canvas with a gold ring.
@@ -299,7 +305,7 @@ const DEFS = [
   { id: 'oi_ladder', name: 'Nathan James Theo 5-shelf ladder bookshelf', cat: 'Office ideas', w: 23.6 * IN, d: 11.7 * IN, h: 72.5 * IN, color: '#6b4a35', color2: '#1b1b1d', mat: 'wood', build: ladderShelf,
     url: 'https://nathanjames.com/products/5-shelf-ladder-bookshelf-walnut-matte-black', colors: [['Walnut / matte black', '#6b4a35']],
     note: '23.6" W × 11.7" D × 72.5" H; leans against the wall and screws to it. Push it flush to a wall.' },
-  { id: 'oi_arc_lamp', name: 'Adesso Ethan arc floor lamp (black / walnut)', cat: 'Office ideas', w: 56 * IN, d: 17 * IN, h: 76.5 * IN, color: '#6b4a35', color2: '#1b1b1d', build: arcLamp,
+  { id: 'oi_arc_lamp', name: 'Adesso Ethan arc floor lamp (black / walnut)', cat: 'Office ideas', light: { kind: 'spot', lm: 800, at: arcShade }, w: 56 * IN, d: 17 * IN, h: 76.5 * IN, color: '#6b4a35', color2: '#1b1b1d', build: arcLamp,
     url: 'https://dulleselectric.com/products/ades_5049-15', colors: [['Black / walnut', '#6b4a35']],
     note: '76.5" H with a 56" reach and 17" shade. The base sits at the left end; rotate it so the shade hangs over the desk or chair.' },
   { id: 'oi_sconce', like: 'sconce', name: 'Crate & Barrel Weston walnut wall sconce', cat: 'Office ideas', w: 5 * IN, d: 8.8 * IN, h: 9.7 * IN, elev: 1.55, color: '#26262a', color2: '#6b4a35',
@@ -401,7 +407,7 @@ const DEFS = [
   { id: 'tv', name: 'TV', cat: 'Living', w: 1.24, d: 0.06, h: 0.72, elev: 0.55, color: '#18181a', mount: 'wall', build: (w, d, h) => [bx(0, 0, 0, w, h, d * 0.7, 'a'), bx(0, 0.015, d * 0.35, w - 0.03, h - 0.03, 0.005, 'screen')] },
   { id: 'bookshelf', name: 'Bookshelf', cat: 'Living', w: 0.8, d: 0.3, h: 1.9, color: '#d8cdbb', mat: 'wood', clear: 0.6, build: bookshelf },
   { id: 'fireplace', name: 'Fireplace', cat: 'Living', w: 1.4, d: 0.4, h: 1.15, color: '#e6e1d8', color2: '#3a3a3c', build: (w, d, h) => [bx(0, 0, 0, w, h - 0.06, d, 'a'), bx(0, h - 0.06, 0.03, w + 0.12, 0.06, d + 0.06, 'a+'), bx(0, 0.08, d / 2 - 0.02, w * 0.55, h * 0.55, 0.05, 'b'), bx(0, 0, d / 2 + 0.15, w, 0.03, 0.3, 'b')] },
-  { id: 'floorlamp', name: 'Floor lamp', cat: 'Living', w: 0.42, d: 0.42, h: 1.6, color: '#efe6d2', color2: '#2b2d31', mat: 'accent', build: lamp },
+  { id: 'floorlamp', name: 'Floor lamp', cat: 'Living', light: { lm: 800, at: (w, d, h) => [[0, h * 0.84, 0]] }, w: 0.42, d: 0.42, h: 1.6, color: '#efe6d2', color2: '#2b2d31', mat: 'accent', build: lamp },
   { id: 'piano', name: 'Upright piano', cat: 'Living', w: 1.5, d: 0.6, h: 1.2, color: '#1d1b1c', build: (w, d, h) => [bx(0, 0, -d * 0.15, w, h, d * 0.7, 'a'), bx(0, h * 0.5, d * 0.3, w - 0.1, 0.08, d * 0.4, 'a+'), bx(0, h * 0.5 + 0.08, d * 0.33, w - 0.16, 0.012, d * 0.26, 'white')] },
 
   // ---------- Bedroom ----------
@@ -468,12 +474,22 @@ const DEFS = [
   { id: 'rug_round', name: 'Round rug', cat: 'Decor', w: 1.8, d: 1.8, h: 0.015, color: '#8fa3a8', mat: 'accent', flat: true, build: (w, d) => [{ ...cy(0, 0, 0, w, 0.012, 'a'), d }, { ...cy(0, 0.012, 0, w * 0.82, 0.003, 'a+'), d: d * 0.82 }] },
   { id: 'plant', name: 'Floor plant', cat: 'Decor', w: 0.6, d: 0.6, h: 1.3, color: '#4f8a4a', color2: '#c9b79c', build: plant },
   { id: 'plant_small', name: 'Small plant', cat: 'Decor', on: 1, w: 0.28, d: 0.28, h: 0.4, color: '#5f9a58', color2: '#e3ded4', build: plant },
-  { id: 'tablelamp', name: 'Table lamp', cat: 'Decor', on: 1, w: 0.3, d: 0.3, h: 0.5, elev: 0.56, color: '#efe6d2', color2: '#b08456', mat: 'accent', build: lamp },
+  { id: 'tablelamp', name: 'Table lamp', cat: 'Decor', light: { lm: 450, at: (w, d, h) => [[0, h * 0.84, 0]] }, on: 1, w: 0.3, d: 0.3, h: 0.5, elev: 0.56, color: '#efe6d2', color2: '#b08456', mat: 'accent', build: lamp },
   { id: 'track_light', name: 'Track light (3 heads)', cat: 'Decor', w: 1.5, d: 0.12, h: 0.16, elev: 2.44, color: '#d9d9d6', mount: 'ceiling',
+    light: { kind: 'spot', lm: 450, k: 3000, at: w => [-w * 0.4, 0, w * 0.4].map(x => [x, 0.01, 0.01]) },
     build: (w, d, h) => { const out = [bx(0, h - 0.025, 0, w, 0.025, 0.035, 'a'), cy(0, h - 0.06, 0, 0.05, 0.035, 'a')];
-      for (const x of [-w * 0.4, 0, w * 0.4]) out.push(cy(x, h - 0.08, 0, 0.012, 0.055, 'a'), cy(x, 0.02, 0.01, 0.06, 0.07, 'a', { t: 0.75 }), cy(x, 0.015, 0.01, 0.045, 0.006, 'led'));
+      for (const x of [-w * 0.4, 0, w * 0.4]) out.push(cy(x, h - 0.08, 0, 0.012, 0.055, 'a'), cy(x, 0.02, 0.01, 0.06, 0.07, 'a', { t: 0.75 }), cy(x, 0.015, 0.01, 0.045, 0.006, 'glow'));
       return out; } },
-  { id: 'pendant', name: 'Pendant light', cat: 'Decor', w: 0.45, d: 0.45, h: 0.7, elev: 1.9, color: '#d9b25f', color2: '#2b2d31', mat: 'accent', build: (w, d, h) => [cy(0, 0.25, 0, 0.012, h - 0.25, 'b'), cy(0, 0, 0, w, 0.25, 'a', { t: 0.35 })] },
+  { id: 'pendant', name: 'Pendant light', cat: 'Decor', w: 0.45, d: 0.45, h: 0.7, elev: 1.9, color: '#d9b25f', color2: '#2b2d31', mat: 'accent', light: { lm: 800, at: () => [[0, 0.12, 0]] }, build: (w, d, h) => [cy(0, 0.25, 0, 0.012, h - 0.25, 'b'), cy(0, 0, 0, w, 0.25, 'a', { t: 0.35 })] },
+  // ---- lighting: fixtures that light the room (each light's colour, brightness and effect are set on the piece) ----
+  { id: 'downlight', name: 'Recessed downlight (4")', cat: 'Lighting', w: 0.13, d: 0.13, h: 0.02, elev: 2.58, color: '#f6f5f2', mount: 'ceiling', light: { kind: 'spot', lm: 700, at: () => [[0, 0, 0]] },
+    build: (w, d, h) => [cy(0, 0.012, 0, w, 0.008, 'a'), cy(0, 0.004, 0, w * 0.72, 0.01, 'glow')] },
+  { id: 'flushlight', name: 'Flush ceiling light', cat: 'Lighting', w: 0.38, d: 0.38, h: 0.1, elev: 2.5, color: '#f6f5f2', color2: '#b9bdc3', mount: 'ceiling', light: { lm: 1600, at: () => [[0, 0.02, 0]] },
+    build: (w, d, h) => [cy(0, h - 0.015, 0, w * 0.5, 0.015, 'b'), cy(0, 0, 0, w, h - 0.015, 'glow', { t: 0.7 })] },
+  { id: 'ledstrip', name: 'RGB LED strip (1 m)', cat: 'Lighting', on: 1, w: 1.0, d: 0.012, h: 0.004, color: '#2b2d31', light: { kind: 'strip', lm: 400, color: '#ff3c9e', face: 'up' },
+    build: (w, d, h) => [bx(0, 0, 0, w, h * 0.5, d, 'a'), bx(0, h * 0.5, 0, w - 0.004, h * 0.5, d * 0.7, 'glow')] },
+  { id: 'ledbars', name: 'RGB light bars (pair)', cat: 'Lighting', on: 1, w: 0.6, d: 0.08, h: 0.3, color: '#1b1b1d', light: { lm: 300, color: '#5a6bff', at: w => [[-w / 2 + 0.04, 0.2, 0], [w / 2 - 0.04, 0.2, 0]] },
+    build: (w, d, h) => [-1, 1].flatMap(s => [cy(s * (w / 2 - 0.04), 0, 0, 0.07, 0.015, 'a'), cy(s * (w / 2 - 0.04), 0.015, 0, 0.035, h - 0.015, 'glow', { t: 1 })]) },
   { id: 'art', name: 'Wall art', cat: 'Wall decor', w: 0.9, d: 0.04, h: 0.6, elev: 1.25, color: '#c98f6b', color2: '#2b2d31', mat: 'accent', mount: 'wall', build: (w, d, h) => [bx(0, 0, 0, w, h, d * 0.7, 'b'), bx(0, 0.04, d * 0.35, w - 0.08, h - 0.08, 0.004, 'white'), bx(0, 0.09, d * 0.35 + 0.002, w - 0.18, h - 0.18, 0.004, 'a')] },
   { id: 'shelf', name: 'Wall shelf', cat: 'Wall decor', w: 0.9, d: 0.24, h: 0.04, elev: 1.5, color: '#b08456', mat: 'wood', mount: 'wall', build: (w, d, h) => [bx(0, 0, 0, w, h, d, 'a')] },
   { id: 'curtains', name: 'Curtains', cat: 'Wall decor', w: 1.8, d: 0.14, h: 2.3, elev: 0.02, color: '#d9d2c4', color2: '#2b2d31', mat: 'accent', mount: 'wall', build: (w, d, h) => { const out = [bx(0, h - 0.04, 0, w + 0.1, 0.025, 0.025, 'b')], pw = Math.min(0.5, w * 0.28);
@@ -527,9 +543,19 @@ export const getDef = type => byId[type] || byId.box;
 const NAMED = { metal: '#b9bdc3', steel: '#c9ccd1', alu: '#c5c8cc', display: '#3b5f8f', led: '#fff1d0', dark: '#2b2d31', black: '#141416', white: '#f6f5f2', glass: '#a9d4e6', screen: '#0c1016', mirror: '#cfe3ea' };
 export function resolveColor(c, item) {
   if (c[0] === '#') return c;
+  if (c === 'glow') return lightOf(item)?.color || NAMED.led; // a light's lit face takes the light's colour
   if (NAMED[c]) return NAMED[c];
   const base = c[0] === 'a' ? item.color : item.color2 || getDef(item.type).color2 || '#8a6a4c';
   return c[1] === '+' ? shade(base, 0.14) : c[1] === '-' ? shade(base, -0.14) : base;
+}
+
+// colour temperatures (kelvin) as light colours, for the light presets
+export const KELVIN = [[2200, '#ffad5e', 'Candle'], [2700, '#ffcf9e', 'Warm'], [3000, '#ffdcb6', 'Soft white'], [4000, '#fff0e0', 'Neutral'], [5000, '#fff8f2', 'Cool'], [6500, '#f2f4ff', 'Daylight']];
+/** A lighting piece's light as set on it, over its defaults: { on, color, lm, effect, speed, face }; null when it gives no light. */
+export function lightOf(item) {
+  const L = getDef(item.type).light;
+  if (!L) return null;
+  return { on: true, color: L.color || KELVIN.find(k => k[0] === (L.k || 2700))[1], lm: L.lm, effect: 'static', speed: 1, face: L.face, ...item.light };
 }
 
 export function partsFor(item) {

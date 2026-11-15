@@ -11,7 +11,8 @@ import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { S, on, emit, touch, commit, select, isSel, find } from './state.js';
 import { rad, lerp, clamp, dot, sub, mul, add, pointInPoly } from './util.js';
-import { partsFor, resolveColor, getDef } from './catalog.js';
+import { partsFor, resolveColor, getDef, lightOf } from './catalog.js';
+import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 import { getFloor, floorCanvas, getFinish, finishCanvas, grainCanvas } from './materials.js';
 import { sits, surfaceUnder, riders } from './ops.js';
 import { contentBounds } from './editor2d.js';
@@ -175,10 +176,12 @@ function buildItem(it) {
     return g;
   }
   const def = getDef(it.type), texId = it.tex ?? def.tex, grainFam = it.grain ? (def.mat === 'fabric' || def.mat === 'bed' ? 'b' : 'a') : null;
+  const L = lightOf(it), glow = L && new THREE.MeshStandardMaterial({ color: '#202022', emissive: L.color, roughness: 0.4 }); // its own: effects animate it
   const byMat = new Map(); // parts are baked into one mesh per material: far fewer draw calls (a keyboard is dozens of keys)
   for (const p of partsFor(it)) {
     const fam = /^[ab][+-]?$/.test(p.c) ? p.c[0] : null;
-    const material = texId && texId !== 'paint' && p.c === 'a' && p.s === 'box' ? texMat(resolveColor('a', it), texId, p.w / getFinish(texId).size, p.h / getFinish(texId).size)
+    const material = p.c === 'glow' ? glow || mat(resolveColor('led', it), 'led')
+      : texId && texId !== 'paint' && p.c === 'a' && p.s === 'box' ? texMat(resolveColor('a', it), texId, p.w / getFinish(texId).size, p.h / getFinish(texId).size)
       : grainFam && fam === grainFam ? grainMat(resolveColor(p.c, it), p.h > Math.max(p.w, p.d) * 1.3)
       : mat(resolveColor(p.c, it), kindOf(p.c));
     const geo = p.s === 'box' ? BOX : p.s === 'rbox' ? rboxGeo(p) : p.s === 'sph' ? SPH : p.s === 'disc' ? DISC : p.s === 'hex' ? HEX : cylGeo(p.t ?? 1);
@@ -196,19 +199,78 @@ function buildItem(it) {
     if (geos.length > 1) geos.forEach(q => q.dispose());
     if (!merged) continue;
     const m = new THREE.Mesh(merged, material);
-    m.castShadow = !material.transparent; m.receiveShadow = true; m.userData.own = true;
+    m.castShadow = !material.transparent && material !== glow; m.receiveShadow = true; m.userData.own = true;
     m.matrixAutoUpdate = false; m.updateMatrix();
     g.add(m);
   }
+  if (L) addLights(g, it, def.light, L, glow);
   return g;
 }
-const disposeItem = grp => grp.traverse(o => { if (o.userData.own) o.geometry.dispose(); });
+const disposeItem = grp => grp.traverse(o => { if (o.userData.own) o.geometry.dispose(); if (o.isLight) o.dispose?.(); });
+
+// ---- lights: lamps and fixtures light the room. No shadows from them (a shadow per lamp would cost a lot).
+// Brightness is in lumens, turned into three.js units with one factor tuned by eye against the sun.
+const LM = 0.12, CONE = 0.75, CONE_SR = 2 * Math.PI * (1 - Math.cos(CONE));
+let lightLevel = 1;
+function addLights(g, it, D, L, glow) {
+  const lights = [];
+  if (D.kind === 'strip') { // a strip washes the surface it faces: one rectangular light along its length
+    const r = new THREE.RectAreaLight(L.color, 0, it.w, 0.03), f = L.face || 'up';
+    if (f === 'up') { r.position.y = it.h; r.rotation.x = Math.PI / 2; } else if (f === 'down') r.rotation.x = -Math.PI / 2;
+    else if (f === 'front') { r.position.z = it.d / 2; r.rotation.y = Math.PI; } else r.position.z = -it.d / 2;
+    r.userData.k = 1 / (Math.PI * it.w * 0.03); lights.push(r); g.add(r);
+  } else {
+    const pts = D.at(it.w, it.d, it.h);
+    for (const [x, y, z] of pts) {
+      const px = it.flip ? -x : x;
+      const l = D.kind === 'spot' ? new THREE.SpotLight(L.color, 0, 10, CONE, 0.6, 2) : new THREE.PointLight(L.color, 0, 10, 2);
+      l.position.set(px, y, z); l.userData.k = 1 / pts.length / (D.kind === 'spot' ? CONE_SR : 4 * Math.PI);
+      if (l.isSpotLight) { l.target.position.set(px, y - 1, z); g.add(l.target); }
+      lights.push(l); g.add(l);
+    }
+  }
+  g.userData.light = { L, lights, glow, phase: Math.random() * 10 };
+}
+const _c = new THREE.Color();
+let rainbowTex = null;
+function rainbow() { // a hue wheel across a strip, scrolled for the rainbow wave
+  if (rainbowTex) return rainbowTex;
+  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 1;
+  const g = cv.getContext('2d'), gr = g.createLinearGradient(0, 0, 256, 0);
+  for (let i = 0; i <= 6; i++) gr.addColorStop(i / 6, `hsl(${i * 60}, 100%, 55%)`);
+  g.fillStyle = gr; g.fillRect(0, 0, 256, 1);
+  rainbowTex = new THREE.CanvasTexture(cv); rainbowTex.wrapS = THREE.RepeatWrapping; rainbowTex.colorSpace = THREE.SRGBColorSpace;
+  return rainbowTex;
+}
+/** Every light's colour and brightness for this moment: on/off, the Lights mode, and its effect. */
+function updateLights(t) {
+  for (const o of itemObjs.values()) {
+    const s = o.group.userData.light;
+    if (!s) continue;
+    const { L, lights, glow } = s, v = t * (L.speed || 1) + s.phase;
+    let f = 1;
+    _c.set(L.color);
+    if (L.effect === 'breathe') f = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(v * 1.6));
+    else if (L.effect === 'cycle' || L.effect === 'rainbow') _c.setHSL((v * 0.06) % 1, 1, 0.55);
+    else if (L.effect === 'flicker') f = 0.8 + 0.1 * Math.sin(v * 7.3) + 0.06 * Math.sin(v * 13.1 + 1) + 0.04 * Math.sin(v * 23.7);
+    const on = L.on && lightLevel > 0 ? f : 0;
+    for (const l of lights) { l.color.copy(_c); l.intensity = L.lm * LM * l.userData.k * on * lightLevel; l.visible = on > 0; }
+    if (glow) {
+      const wave = L.effect === 'rainbow';
+      if (wave !== !!glow.emissiveMap) { glow.emissiveMap = wave ? rainbow() : null; glow.needsUpdate = true; }
+      if (wave) { glow.emissive.set('#ffffff'); glow.emissiveMap.offset.x = -v * 0.05; } else glow.emissive.copy(_c);
+      glow.emissiveIntensity = 1.6 * on;
+    }
+  }
+}
+/** Lights mode (in the prefs): 'auto' (on as it gets dark), 'on' or 'off'. */
+export function setLights() { placeSun(); }
 
 function syncItems() {
   const seen = new Set();
   for (const it of S.doc.items) {
     seen.add(it.id);
-    const sig = [it.type, it.w, it.d, it.h, it.color, it.color2, it.flip, it.assetId, it.image, it.tex, it.grain, it.slab, it.chaiseW, it.seatH, it.armH, it.seatD, it.leafDown, it.noMattress, it.bed, it.shelf, it.drawerTop, it.led].join('|');
+    const sig = [it.type, it.w, it.d, it.h, it.color, it.color2, it.flip, it.assetId, it.image, it.tex, it.grain, it.slab, it.chaiseW, it.seatH, it.armH, it.seatD, it.leafDown, it.noMattress, it.bed, it.shelf, it.drawerTop, it.led, it.light && JSON.stringify(it.light)].join('|');
     let o = itemObjs.get(it.id);
     if (!o || o.sig !== sig) {
       if (o) { itemsGroup.remove(o.group); disposeItem(o.group); }
@@ -437,6 +499,8 @@ function placeSun() {
   const { c, R } = sun.userData.c ? sun.userData : { c: { x: 0, y: 0 }, R: 10 };
   const st = site(), p = sunPosition(zonedInstant(sunWhen.date, sunWhen.minutes, st.tz), st.lat, st.lon);
   sunInfo = p;
+  const lightMode = S.prefs.lights || 'auto';
+  lightLevel = lightMode === 'off' ? 0 : lightMode === 'on' ? 1 : 0.2 + 0.8 * (1 - clamp(p.el / 12, 0, 1)); // auto: full once the sun is low
   const dir = bearingDir(p.az, st.north), el = rad(Math.max(p.el, 1)), far = st.buildings?.length ? Math.max(R * 2, 400) : R * 2;
   sun.position.set(c.x + dir.x * Math.cos(el) * far, Math.sin(el) * far, c.y + dir.y * Math.cos(el) * far);
   sun.target.position.set(c.x, 0, c.y); sun.target.updateMatrixWorld();
@@ -588,6 +652,7 @@ function frame(now) {
   }
   if (vis !== wallVisSig) { wallVisSig = vis; shadowsDirty(); } // a hidden wall stops casting its shadow
   helpers.children.forEach(h => h.update());
+  updateLights(now / 1000);
   quality === 'high' && composer ? composer.render() : renderer.render(scene, camera);
   adapt(ms);
   if (perfEl) perfStats(ms);
@@ -680,6 +745,7 @@ export function init3d(el) {
   renderer.setPixelRatio(baseRatio());
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true;
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.9;
+  RectAreaLightUniformsLib.init(); // LED strips
   pane.prepend(renderer.domElement);
   scene = new THREE.Scene(); scene.background = new THREE.Color('#eef2f6');
   camera = new THREE.PerspectiveCamera(50, 1, 0.02, 3000);

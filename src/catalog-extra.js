@@ -128,7 +128,7 @@ const mouse = (w, d, h) => [sp(0, -h, 0, w, 2 * h, d, 'a'), bx(0, h * 0.86, -d *
 const riser = (w, d, h) => [rb(0, h - 0.018, 0, w, 0.018, d, 'a', 0.004), ...[-1, 1].flatMap(s => { const x = s * (w / 2 - 0.05); return [bx(x, 0, 0, 0.012, 0.006, d - 0.03, 'b'), bx(x, 0.006, -d / 2 + 0.021, 0.012, h - 0.024, 0.012, 'b'), bx(x, 0.006, d / 2 - 0.021, 0.012, h - 0.024, 0.012, 'b')]; })];
 const deskShelf = (w, d, h) => [rb(0, h - 0.018, 0, w, 0.018, d, 'a', 0.004), bx(-w / 2 + 0.009, 0, 0, 0.018, h - 0.018, d - 0.006, 'a'), bx(w / 2 - 0.009, 0, 0, 0.018, h - 0.018, d - 0.006, 'a'), bx(w * 0.18, 0, 0, 0.014, h - 0.018, d - 0.02, 'a'),
   bx(w * 0.34, 0.002, 0.004, w * 0.3 - 0.022, h - 0.024, d - 0.012, 'a-'), bx(w * 0.34, h * 0.4, d / 2 - 0.001, 0.05, 0.006, 0.006, 'dark')];
-const deskLamp = (w, d, h) => { const x0 = -w / 2 + d / 2; return [cy(x0, 0, 0, d, 0.014, 'a'), cy(x0, 0.014, 0, 0.014, h - 0.03, 'a'), rb(x0 + (w - d / 2) / 2 - 0.01, h - 0.02, 0, w - d / 2, 0.016, 0.034, 'a', 0.007), bx(x0 + (w - d / 2) / 2 + 0.02, h - 0.022, 0, w - d / 2 - 0.08, 0.003, 0.022, 'led')]; };
+const deskLamp = (w, d, h) => { const x0 = -w / 2 + d / 2; return [cy(x0, 0, 0, d, 0.014, 'a'), cy(x0, 0.014, 0, 0.014, h - 0.03, 'a'), rb(x0 + (w - d / 2) / 2 - 0.01, h - 0.02, 0, w - d / 2, 0.016, 0.034, 'a', 0.007), bx(x0 + (w - d / 2) / 2 + 0.02, h - 0.022, 0, w - d / 2 - 0.08, 0.003, 0.022, 'glow')]; };
 const speaker = (w, d, h) => [rb(0, 0, -0.004, w, h, d - 0.008, 'a', 0.012), disc(0, h * 0.12, d / 2 - 0.006, w * 0.74, 0.004, 'dark'), disc(0, h * 0.12 + w * 0.2, d / 2 - 0.003, w * 0.34, 0.005, 'b'), disc(0, h * 0.68, d / 2 - 0.006, w * 0.34, 0.004, 'dark'), disc(0, h * 0.68 + w * 0.1, d / 2 - 0.003, w * 0.14, 0.005, 'b')];
 const headphones = (w, d, h) => { const x = w / 2 - 0.022; return [cy(0, 0, 0, d, 0.012, 'b'), cy(0, 0.012, 0, 0.016, h - 0.04, 'b'), rb(0, h - 0.034, 0, 0.06, 0.012, 0.04, 'b', 0.005),
   rb(0, h - 0.02, 0, 2 * x + 0.014, 0.02, 0.03, 'a', 0.009), ...[-1, 1].flatMap(s => [rb(s * x, h - 0.13, 0, 0.012, 0.12, 0.022, 'a', 0.005), sp(s * x, h - 0.23, 0, 0.042, 0.1, 0.085, 'a'), sp(s * (x - 0.014), h - 0.225, 0, 0.03, 0.09, 0.075, 'dark')])]; };
@@ -175,7 +175,7 @@ const platformBed = (w, d, h) => { const n = w > 1.2 ? 2 : 1, pw = (w - 0.2) / n
     rb(0, 0.18, 0.04, w, m, d - 0.04, 'white', 0.06), rb(0, 0.2, d * 0.17, w + 0.03, m + 0.03, d * 0.62, 'a', 0.07), rb(0, 0.22, -d * 0.15, w + 0.03, m + 0.035, 0.2, 'a+', 0.06),
     ...Array.from({ length: n }, (_, i) => rb(-w / 2 + 0.1 + pw * (i + 0.5), 0.18 + m - 0.03, -d / 2 + 0.3, pw - 0.06, 0.14, 0.4, 'white', 0.06, { rx: -0.12 }))]; };
 const pedestalTable = (w, d, h) => [{ ...cy(0, h - 0.025, 0, w, 0.025, 'a'), d }, cy(0, 0.02, 0, w * 0.2, h - 0.045, 'a', { t: 0.55 }), { ...cy(0, 0, 0, w * 0.62, 0.02, 'a'), d: d * 0.62 }];
-const slimLamp = (w, d, h) => [cy(0, 0, 0, w, 0.015, 'b'), cy(0, 0.015, 0, 0.016, h - 0.2, 'b'), cy(0, h - 0.2, 0, w * 0.5, 0.2, 'a', { t: 0.8 }), cy(0, h - 0.202, 0, w * 0.44, 0.003, 'led')];
+const slimLamp = (w, d, h) => [cy(0, 0, 0, w, 0.015, 'b'), cy(0, 0.015, 0, 0.016, h - 0.2, 'b'), cy(0, h - 0.2, 0, w * 0.5, 0.2, 'a', { t: 0.8 }), cy(0, h - 0.202, 0, w * 0.44, 0.003, 'glow')];
 
 // ---------- appliances ----------
 const slimFridge = (w, d, h) => { const fz = h * 0.36, z = d / 2 - 0.025; return [bx(0, 0, -0.03, w, h, d - 0.06, 'a-'), rb(0, 0.04, z, w - 0.006, fz - 0.045, 0.05, 'a', 0.006), rb(0, fz + 0.004, z, w - 0.006, h - fz - 0.008, 0.05, 'a', 0.006),
@@ -230,7 +230,7 @@ export const DESK = [ // everything here rests on the furniture under it
   { id: 'keyboard_full', name: 'Keyboard, full size', cat: 'Desk setup', w: 0.44, d: 0.13, h: 0.03, color: '#d9d6cf', color2: '#f3f1ec', build: keyboard },
   { id: 'mouse', name: 'Mouse', cat: 'Desk setup', w: 0.062, d: 0.11, h: 0.036, color: '#2b2d31', build: mouse },
   { id: 'deskmat', name: 'Desk mat', cat: 'Desk setup', w: 0.8, d: 0.35, h: 0.003, color: '#4a4d52', surf: 1, build: (w, d, h) => [rb(0, 0, 0, w, h, d, 'a', h * 0.45)] },
-  { id: 'desklamp', name: 'Desk lamp', cat: 'Desk setup', w: 0.42, d: 0.14, h: 0.42, color: '#232427', build: deskLamp },
+  { id: 'desklamp', name: 'Desk lamp', cat: 'Desk setup', light: { kind: 'spot', lm: 400, k: 4000, at: (w, d, h) => [[-w / 2 + d / 2 + (w - d / 2) / 2 + 0.02, h - 0.03, 0]] }, w: 0.42, d: 0.14, h: 0.42, color: '#232427', build: deskLamp },
   { id: 'speaker', name: 'Desktop speaker', cat: 'Desk setup', w: 0.14, d: 0.17, h: 0.23, color: '#f1efea', color2: '#b9bdc3', build: speaker },
   { id: 'headphones', name: 'Headphones & stand', cat: 'Desk setup', w: 0.2, d: 0.11, h: 0.29, color: '#2b2d31', color2: '#b08456', build: headphones },
   { id: 'microphone', name: 'Microphone', cat: 'Desk setup', w: 0.12, d: 0.12, h: 0.28, color: '#2b2d31', color2: '#3a3d42', build: microphone },
@@ -248,7 +248,7 @@ export const MORE = [
   { id: 'sofa_modern', name: 'Modern sofa', cat: 'Living', w: 2.2, d: 0.95, h: 0.76, color: '#c9c3b8', mat: 'fabric', build: modernSofa },
   { id: 'lounge', name: 'Lounge chair', cat: 'Living', w: 0.74, d: 0.8, h: 0.78, color: '#b3a48f', color2: '#8a6a4c', mat: 'fabric', build: lounge },
   { id: 'pedestal_table', name: 'Pedestal side table', cat: 'Living', w: 0.45, d: 0.45, h: 0.5, color: '#f1efea', build: pedestalTable },
-  { id: 'slimlamp', name: 'Slim floor lamp', cat: 'Living', w: 0.26, d: 0.26, h: 1.5, color: '#f1efea', color2: '#232427', build: slimLamp },
+  { id: 'slimlamp', name: 'Slim floor lamp', cat: 'Living', light: { lm: 600, at: (w, d, h) => [[0, h - 0.1, 0]] }, w: 0.26, d: 0.26, h: 1.5, color: '#f1efea', color2: '#232427', build: slimLamp },
   { id: 'soundbar', name: 'Soundbar', cat: 'Living', w: 0.95, d: 0.1, h: 0.065, color: '#2b2d31', on: 1, build: soundbar },
   { id: 'bed_platform', name: 'Platform bed', cat: 'Bedroom', w: 1.52, d: 2.03, h: 0.85, color: '#d8d3c8', color2: '#a47a4f', mat: 'bed', clear: 0.5, build: platformBed, sizes: [['Twin', 0.99, 1.91], ['Full', 1.37, 1.91], ['Queen', 1.52, 2.03], ['King', 1.93, 2.03]] },
   { id: 'fridge_slim', name: 'Fridge, flat-front', cat: 'Kitchen', w: 0.7, d: 0.7, h: 1.86, color: '#c9ccd1', clear: 0.9, build: slimFridge },

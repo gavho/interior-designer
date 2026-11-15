@@ -2,7 +2,7 @@
 // the properties inspector, dialogs, context menu and toasts.
 import { S, on, emit, commit, touch, undo, redo, canUndo, canRedo, select, selOf, find, isSel, setTool, setPref, setDoc, newDoc, exportProject, parseProject, exportBackup, importBackup, restoreSnapshot, kvGet, kvSet, saveLibrary, listProjects, saveSlot, openSlot, deleteSlot } from './state.js';
 import { h, uid, fmtLen, parseLen, fmtArea, fmtMoney, download, readAsDataURL, pickFile, normDeg, dist, clamp, add, sub, mul } from './util.js';
-import { CATALOG, CATEGORIES, getDef, thumbnail } from './catalog.js';
+import { CATALOG, CATEGORIES, getDef, thumbnail, lightOf, KELVIN } from './catalog.js';
 import { FLOORS, PALETTES, SWATCHES, floorCanvas, WALL_FINISHES, WOODS, COUNTERS } from './materials.js';
 import * as ops from './ops.js';
 import { analyze } from './analysis.js';
@@ -571,6 +571,21 @@ function addToLibrary(it) {
   saveLibrary(); emit('library'); toast('Saved to My library');
 }
 
+// a lamp's or fixture's light: on/off, colour (white temperatures or any RGB), brightness and effects
+const EFFECTS = [['static', 'Steady'], ['breathe', 'Breathe (slow pulse)'], ['flicker', 'Candle flicker'], ['cycle', 'Colour cycle'], ['rainbow', 'Rainbow wave (strips)']];
+function lightSection(it, def) {
+  const L = lightOf(it), set = patch => (it.light = { ...it.light, ...patch });
+  return section('Light',
+    check('On', L.on, edit(v => set({ on: v }))),
+    h('div.presets.retail', null, h('span', null, 'White'), KELVIN.map(([k, c, n]) => h('button.named', { title: `${k} K`, onclick: edit(() => set({ color: c })) }, h('i', { style: { background: c } }), n))),
+    row('Colour', colorInput(L.color, live(v => set({ color: v })), edit(v => set({ color: v })))),
+    row('Brightness', numInput(L.lm, edit(v => set({ lm: Math.max(0, v) })), { min: 0, max: 20000, step: 50 }), h('small', null, ' lumens')),
+    row('Effect', selectInput(EFFECTS, L.effect, edit(v => set({ effect: v })))),
+    L.effect !== 'static' && row('Speed', h('input', { type: 'range', min: 0.2, max: 4, step: 0.1, value: L.speed, oninput: e => { set({ speed: +e.target.value }); touch(); }, onchange: () => commit() })),
+    def.light.kind === 'strip' && row('Shines', selectInput([['up', 'Up (cove, top of a cabinet)'], ['down', 'Down (under a cabinet or shelf)'], ['back', 'Back (behind a TV or desk)'], ['front', 'Forward']], L.face || 'up', edit(v => set({ face: v })))),
+    h('p.hint', null, def.light.kind === 'strip' ? 'Stretch the strip to its real length; set its height off the floor to mount it under a cabinet or up in a cove.' : 'A 60 W bulb gives about 800 lumens. Lights brighten as the sun goes down; the Lights switch in the 3D bar turns them all on or off.'));
+}
+
 // ------------------------------------------------------------------ properties inspector
 function itemProps(items) {
   const it = items[0], def = getDef(it.type), many = items.length > 1;
@@ -616,6 +631,7 @@ function itemProps(items) {
       (def.color2 || it.color2) && row('Secondary', colorInput(it.color2 || def.color2, live(v => (it.color2 = v)), edit(v => (it.color2 = v)))),
       h('div.stack', null, !def.hand && check('Mirror', it.flip, edit(v => (it.flip = v))), check('Lock position', it.locked, edit(v => (it.locked = v))),
         check('Rest on furniture', ops.sits(it), edit(v => { it.on = v; if (v) it.elev = ops.surfaceUnder(it); })))),
+    def.light && lightSection(it, def),
     section('Shopping', row('Price', numInput(it.price ?? '', edit(v => (it.price = v || undefined)), { step: 0.01, min: 0 })),
       row('Link', textInput(it.url, edit(v => (it.url = v || undefined)), { placeholder: 'https://…', type: 'url' }), it.url && h('a.go', { href: it.url, target: '_blank', rel: 'noopener' }, '↗')),
       it.type === 'product' && row('Photo URL', textInput(it.image, edit(v => (it.image = v)), { placeholder: 'https://…' })),
@@ -747,7 +763,8 @@ function build3dHud() {
   $('hud3d').replaceChildren(
     h('div.hudgroup', null, btn('Orbit', () => api3d.setCamera('iso'), { title: 'Reset to an overview' }), btn('Top', () => api3d.setCamera('top')), btn('Front', () => api3d.setCamera('front')), walkB),
     h('div.hudgroup', null, h('span', null, 'Walls'), selectInput([['auto', 'Cut-away'], ['full', 'All'], ['none', 'Hidden']], 'auto', v => api3d.setWallMode(v)),
-      check('Shadows', true, v => api3d.setShadows(v)), check('Neighbours', S.prefs.showContext, v => { setPref('showContext', v); api3d.showContext(v); })),
+      check('Shadows', true, v => api3d.setShadows(v)), check('Neighbours', S.prefs.showContext, v => { setPref('showContext', v); api3d.showContext(v); }),
+      h('span', null, 'Lights'), selectInput([['auto', 'Auto'], ['on', 'On'], ['off', 'Off']], S.prefs.lights || 'auto', v => { setPref('lights', v); api3d.setLights(v); })),
     sunBar(),
     h('div.hudgroup', null, h('span', null, 'Quality'), selectInput([['standard', 'Standard'], ['high', 'High (ambient occlusion)']], 'standard', v => api3d.setQuality(v)),
       btn('📷 Photo render', () => { toast('Preparing the render…'); api3d.startRender().catch(() => toast('The photo renderer could not start on this device')); }, { cls: 'primary', title: 'Path-traced render of this view: real light bounces, soft shadows and reflections' })),
