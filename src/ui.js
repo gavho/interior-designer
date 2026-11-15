@@ -1,8 +1,8 @@
 // Application chrome: top bar, tool rail, catalogue / build / style / objects / insights tabs,
 // the properties inspector, dialogs, context menu and toasts.
 import { S, on, emit, commit, touch, undo, redo, canUndo, canRedo, select, selOf, find, isSel, setTool, setPref, setDoc, newDoc, exportProject, parseProject, exportBackup, importBackup, restoreSnapshot, kvGet, kvSet, saveLibrary, listProjects, saveSlot, openSlot, deleteSlot } from './state.js';
-import { h, uid, fmtLen, parseLen, fmtArea, fmtMoney, download, readAsDataURL, pickFile, normDeg, dist, clamp, add, sub, mul } from './util.js';
-import { CATALOG, CATEGORIES, getDef, thumbnail } from './catalog.js';
+import { h, uid, fmtLen, parseLen, fmtArea, fmtMoney, download, readAsDataURL, pickFile, normDeg, dist, clamp, add, sub, mul, rot } from './util.js';
+import { CATALOG, CATEGORIES, getDef, thumbnail, MODULE_TYPES, moduleBounds } from './catalog.js';
 import { FLOORS, PALETTES, SWATCHES, floorCanvas, WALL_FINISHES, WOODS, COUNTERS } from './materials.js';
 import * as ops from './ops.js';
 import { analyze } from './analysis.js';
@@ -368,6 +368,47 @@ function exportCablesCSV() {
     ...schedule().map(r => [r.c.label, r.kind, r.from, r.to, r.route, r.L && (r.L.measured / FT).toFixed(1), r.L && r.L.measured.toFixed(2), Math.round((r.c.slack ?? 0.15) * 100), r.L && (r.L.need / FT).toFixed(1), r.L?.buyFt ?? (r.L && Math.ceil(r.L.need / FT))])];
   download(`${S.doc.name}-cables.csv`, rows.map(r => r.map(q).join(',')).join('\n'), 'text/csv');
 }
+// ---- modular sofa editor: rearrange the pieces on a grid ----
+let modCell = null;
+const MOD_PRESETS = {
+  'U-shape (as shipped)': [[0, 0, 'seat', 0], [1, 0, 'seat', 0], [2, 0, 'seat', 0], [3, 0, 'seat', 0], [0, 1, 'ottoman', 0], [3, 1, 'ottoman', 0]],
+  'Sofa + double chaise': [[0, 0, 'seat', 0], [1, 0, 'seat', 0], [2, 0, 'seat', 0], [3, 0, 'seat', 0], [3, 1, 'ottoman', 0], [3, 2, 'ottoman', 0]],
+  'Long sofa, ottomans in front': [[0, 0, 'seat', 0], [1, 0, 'seat', 0], [2, 0, 'seat', 0], [3, 0, 'seat', 0], [1, 1, 'ottoman', 0], [2, 1, 'ottoman', 0]],
+  'L-shape + ottoman': [[0, 0, 'seat', 0], [1, 0, 'seat', 0], [2, 0, 'seat', 0], [0, 1, 'seat', 3], [1, 1, 'ottoman', 0], [0, 2, 'ottoman', 0]],
+  'Two loveseats facing': [[0, 0, 'seat', 0], [1, 0, 'seat', 0], [0, 1, 'ottoman', 0], [1, 1, 'ottoman', 0], [0, 2, 'seat', 2], [1, 2, 'seat', 2]],
+  'Pit / daybed': [[0, 0, 'seat', 0], [1, 0, 'seat', 0], [0, 1, 'ottoman', 0], [1, 1, 'ottoman', 0], [0, 2, 'seat', 2], [1, 2, 'seat', 2]],
+};
+/** Replace the pieces; resize the footprint to fit and keep the existing pieces where they are on the plan. */
+function setModules(it, def, mods) {
+  if (!mods.length) { toast('A sofa needs at least one piece'); return; }
+  const cw = it.w / (moduleBounds(it.modules).x1 - moduleBounds(it.modules).x0 + 1), cd = it.d / (moduleBounds(it.modules).y1 - moduleBounds(it.modules).y0 + 1);
+  const B0 = moduleBounds(it.modules), B1 = moduleBounds(mods);
+  const shift = rot({ x: ((B1.x0 + B1.x1) - (B0.x0 + B0.x1)) / 2 * cw, y: ((B1.y0 + B1.y1) - (B0.y0 + B0.y1)) / 2 * cd }, it.rot);
+  it.modules = mods; it.w = (B1.x1 - B1.x0 + 1) * cw; it.d = (B1.y1 - B1.y0 + 1) * cd; it.x += shift.x; it.y += shift.y;
+  commit();
+}
+function moduleEditor(it, def) {
+  const mods = it.modules || [], B = moduleBounds(mods), at = (x, y) => mods.find(m => m.x === x && m.y === y);
+  const arrow = ['↓', '←', '↑', '→'], count = t => mods.filter(m => m.t === t).length;
+  const sel = modCell && at(modCell.x, modCell.y);
+  const grid = h('div.modgrid', { style: { gridTemplateColumns: `repeat(${B.x1 - B.x0 + 3}, 1fr)` } });
+  for (let y = B.y0 - 1; y <= B.y1 + 1; y++) for (let x = B.x0 - 1; x <= B.x1 + 1; x++) {
+    const m = at(x, y), on = modCell && modCell.x === x && modCell.y === y;
+    grid.append(h('button.modcell' + (m ? '.' + m.t : '.empty') + (on ? '.on' : ''), { title: m ? MODULE_TYPES[m.t] : 'Empty: tap, then add a piece', onclick: () => { modCell = { x, y }; emit('sel'); } },
+      m ? (m.t === 'ottoman' ? '▢' : (m.t === 'corner' ? '◰ ' : '') + arrow[m.r]) : '+'));
+  }
+  const put = (t) => { if (!modCell) return toast('Tap a square in the grid first'); const rest = mods.filter(m => !(m.x === modCell.x && m.y === modCell.y)); setModules(it, def, [...rest, { x: modCell.x, y: modCell.y, t, r: sel?.r ?? 0 }]); };
+  return section('Pieces',
+    h('p.hint', null, 'Tap a square, then choose what goes there. Arrows show which way each seat faces (↓ = toward the front of the sofa).'),
+    grid,
+    h('div.btnwrap', null, btn('Seat', () => put('seat')), btn('Corner seat', () => put('corner')), btn('Ottoman', () => put('ottoman')),
+      btn('Rotate ⟳', () => { if (!sel) return toast('Tap a piece first'); setModules(it, def, mods.map(m => (m === sel ? { ...m, r: (m.r + 3) % 4 } : m))); }, { disabled: !sel || sel.t === 'ottoman' }),
+      btn('Remove', () => { if (!sel) return; modCell = null; setModules(it, def, mods.filter(m => m !== sel)); }, { disabled: !sel, cls: 'danger' })),
+    row('Layout', selectInput([['', 'Choose a layout…'], ...Object.keys(MOD_PRESETS).map(k => [k, k])], '', v => { if (!v) return; modCell = null; setModules(it, def, MOD_PRESETS[v].map(([x, y, t, r]) => ({ x, y, t, r }))); })),
+    check('Arms on open ends', it.arms !== false, edit(v => (it.arms = v))),
+    h('p.hint', null, `Uses ${count('seat') + count('corner')} seat${count('seat') + count('corner') === 1 ? '' : 's'}${count('corner') ? ` (${count('corner')} corner)` : ''} and ${count('ottoman')} ottoman${count('ottoman') === 1 ? '' : 's'}: ${L(it.w)} × ${L(it.d)}. The set comes with 4 seats and 2 ottomans${count('seat') + count('corner') > 4 || count('ottoman') > 2 || count('corner') ? '; this layout needs extra or different pieces' : ''}.`));
+}
+
 function pointProps(q) {
   const k = POINT_KINDS[q.kind] || POINT_KINDS.outlet;
   return [h('h2', null, k.name),
@@ -596,6 +637,7 @@ function itemProps(items) {
           h('p.hint', null, 'Gaps are the clear distance to the facing wall. Type a value to position the piece exactly.')];
       })()),
     def.note && h('p.hint.note', null, def.note),
+    def.modular && !many && moduleEditor(it, def),
     def.hand && section('Chaise side', h('div.seg2', null, [['left', 'Left-hand facing'], ['right', 'Right-hand facing']].map(([v, l]) =>
       h('button' + (ops.handOf(it) === v ? '.on' : ''), { onclick: () => ops.setHand([it], v) }, l))), h('p.hint', null, 'As you face the front of the sofa: right-hand facing has the chaise on your right.')),
     section('Finish', row(def.color2 ? 'Main' : 'Colour', colorInput(it.color, live(v => (it.color = v)), edit(v => (it.color = v)))),

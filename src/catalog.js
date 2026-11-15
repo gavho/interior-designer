@@ -119,6 +119,33 @@ const tubeTable = (w, d, h, it = {}) => {
   if (it.led) out.push(bx(0, 0.004, 0, w - 0.09, 0.012, d - 0.07, 'led'));
   return out;
 };
+// Modular sectional: pieces on a grid (it.modules = [{ x, y, t: 'seat' | 'corner' | 'ottoman', r: 0-3 }], r = which way the seat
+// faces: 0 front, 1 left, 2 back, 3 right). Arms appear on a seat's open sides when "arms" is on. Each grid cell is one module.
+export const MODULE_TYPES = { seat: 'Seat (armless)', corner: 'Corner seat', ottoman: 'Ottoman' };
+export function moduleBounds(mods) {
+  const xs = mods.map(m => m.x), ys = mods.map(m => m.y);
+  return mods.length ? { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) } : { x0: 0, x1: 0, y0: 0, y1: 0 };
+}
+const rotPart = (p, r) => r === 1 ? { ...p, x: -p.z, z: p.x, w: p.d, d: p.w } : r === 2 ? { ...p, x: -p.x, z: -p.z } : r === 3 ? { ...p, x: p.z, z: -p.x, w: p.d, d: p.w } : p;
+const sideDir = r => [[1, 0], [0, 1], [-1, 0], [0, -1]][r]; // the module's local +x in grid steps
+const modularSofa = (w, d, h, it = {}) => {
+  const mods = it.modules || [], B = moduleBounds(mods), nx = B.x1 - B.x0 + 1, ny = B.y1 - B.y0 + 1, mw = w / nx, md = d / ny;
+  const sh = it.seatH || 0.465, back = 0.26, arm = 0.17, base = 0.05, out = [], at = (x, y) => mods.find(m => m.x === x && m.y === y);
+  for (const m of mods) {
+    const cx = (m.x - (B.x0 + B.x1) / 2) * mw, cz = (m.y - (B.y0 + B.y1) / 2) * md, odd = m.r % 2, W = odd ? md : mw, D = odd ? mw : md, parts = [];
+    parts.push(bx(0, 0, 0, W - 0.06, base, D - 0.06, 'dark'));
+    if (m.t === 'ottoman') parts.push(rb(0, base, 0, W - 0.01, sh - base, D - 0.01, 'a', 0.07));
+    else {
+      parts.push(rb(0, base, back / 2, W - 0.01, sh - base, D - back - 0.01, 'a', 0.07), rb(0, base, -D / 2 + back / 2, W - 0.01, h - base, back, 'a+', 0.09));
+      if (m.t === 'corner') parts.push(rb(-W / 2 + back / 2, base, 0, back, h - base, D - 0.01, 'a+', 0.09));
+      if (it.arms !== false) for (const s of m.t === 'corner' ? [1] : [-1, 1]) {
+        const [dx, dy] = sideDir(m.r); if (!at(m.x + s * dx, m.y + s * dy)) parts.push(rb(s * (W / 2 - arm / 2), base, 0.02, arm, sh + 0.17 - base, D - 0.03, 'a', 0.07));
+      }
+    }
+    for (const p of parts) { const q = rotPart(p, m.r); out.push({ ...q, x: q.x + cx, z: q.z + cz }); }
+  }
+  return out;
+};
 // Desk with a two-tone top (wood ends, black centre panel) on black U-frame legs.
 const uFrameDesk = (w, d, h) => {
   const tt = 0.025, lg = 0.05, top = h - tt, out = [bx(-w / 2 + w / 8, top, 0, w / 4, tt, d, 'a'), bx(w / 2 - w / 8, top, 0, w / 4, tt, d, 'a'), bx(0, top, 0, w / 2, tt, d, '#1d1d1f')];
@@ -270,6 +297,11 @@ const DEFS = [
   { id: 'tube_coffee', name: 'Modern rounded coffee table with open shelves', cat: 'My picks', w: 47.2 * IN, d: 18.9 * IN, h: 18.3 * IN, color: '#5b3f2d', mat: 'wood', build: tubeTable,
     colors: [['Walnut brown', '#5b3f2d']],
     note: 'Listed size: 47.2" L × 18.9" W × 18.3" H; 15.7" body on a 2.6" recessed base; open cubbies 13.4" high, the smaller one 21.9" wide. Holds 100 lb on the top and 100 lb on the shelf. Has 16-colour LED lights under the base (tick LED lights).' },
+  { id: 'lr_modular', name: 'Latitude Run 155.7" 6-piece modular chenille sectional', cat: 'My picks', w: 155.7 * IN, d: 75.5 * IN, h: 35.6 * IN, color: '#d6c9b3', mat: 'fabric', modular: true,
+    modW: 155.7 * IN / 4, modD: 75.5 * IN / 2, build: modularSofa,
+    url: 'https://www.wayfair.com/furniture/pdp/latitude-run-1557-w-6-piece-modular-chenille-sectional-w112367038.html?piid=350313746',
+    colors: [['Beige chenille', '#d6c9b3'], ['Gray chenille', '#9a9894'], ['Green chenille', '#6f7a62'], ['Camel chenille', '#b98b5e'], ['Dark gray chenille', '#55565a'], ['Black chenille', '#232325']],
+    note: 'Listed size: 155.7" W × 75.5" D × 35.6" H, seat 18.3" high; ships as 6 pieces: 4 seats and 2 ottomans (each about 38.9" × 37.75"), arranged as a wide U. Rearrange the pieces below. Swatch colours are approximate.' },
   { id: 'tribesigns_desk', name: 'Tribesigns 63" computer desk', cat: 'My picks', w: 63 * IN, d: 31.5 * IN, h: 29.53 * IN, color: '#7a4e2d', color2: '#1b1b1d', build: uFrameDesk,
     colors: [['Rustic brown / black', '#7a4e2d']],
     note: 'Listed size: 63" × 31.5" × 29.53" H; two-tone top (15.75" wood ends, 31.5" black centre), 1.97" square black metal legs.' },

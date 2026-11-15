@@ -9,7 +9,7 @@ const clone = o => JSON.parse(JSON.stringify(o));
 
 export function makeItem(type, extra = {}) {
   const d = getDef(type);
-  return { id: uid('it'), type, name: d.name, x: 0, y: 0, rot: 0, w: d.w, d: d.d, h: d.h, elev: d.elev || 0, color: d.color, ...(d.color2 ? { color2: d.color2 } : {}), ...(d.url ? { url: d.url } : {}), ...extra };
+  return { id: uid('it'), type, name: d.name, x: 0, y: 0, rot: 0, w: d.w, d: d.d, h: d.h, elev: d.elev || 0, color: d.color, ...(d.color2 ? { color2: d.color2 } : {}), ...(d.url ? { url: d.url } : {}), ...(d.modular ? { modules: [0, 1, 2, 3].map(x => ({ x, y: 0, t: 'seat', r: 0 })).concat([{ x: 0, y: 1, t: 'ottoman', r: 0 }, { x: 3, y: 1, t: 'ottoman', r: 0 }]) } : {}), ...extra };
 }
 /** Right-hand facing = chaise on your right as you face the sofa (the catalogue default); flipping mirrors the piece. */
 export const handOf = it => (getDef(it.type).hand ? ((getDef(it.type).hand === 'right') !== !!it.flip ? 'right' : 'left') : null);
