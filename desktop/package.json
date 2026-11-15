@@ -22,7 +22,7 @@
     "appId": "app.interiordesigner.desktop",
     "productName": "Interior Designer",
     "files": ["main.cjs", "preload.cjs", "node_modules/three/**", "node_modules/three-mesh-bvh/**", "node_modules/three-gpu-pathtracer/**"],
-    "extraResources": [{ "from": "..", "to": "web", "filter": ["index.html", "styles.css", "manifest.webmanifest", "src/**", "samples/**", "icons/**", "hud/dist/**"] }],
+    "extraResources": [{ "from": "..", "to": "web", "filter": ["index.html", "styles.css", "manifest.webmanifest", "src/**", "samples/**", "icons/**"] }],
     "fileAssociations": [{ "ext": "json", "name": "Interior Designer project", "role": "Editor" }],
     "mac": { "category": "public.app-category.graphics-design", "icon": "../icons/icon-512.png" },
     "win": { "icon": "../icons/icon-512.png" },

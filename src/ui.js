@@ -740,12 +740,10 @@ function build3dHud() {
   const pad = h('div.walkpad', { style: { display: 'none' } },
     h('div.hudgroup', null, hold('◀', 'KeyA', 'Step left'), h('div.walkcol', null, hold('▲', 'KeyW', 'Forward'), hold('▼', 'KeyS', 'Back')), hold('▶', 'KeyD', 'Step right')),
     h('div.hudgroup', null, hold('⟲', 'ArrowLeft', 'Turn left'), hold('⟳', 'ArrowRight', 'Turn right'), btn('Exit', () => api3d.setWalk(false))));
-  const cross = $('pane3d').querySelector('.crosshair') || $('pane3d').appendChild(h('div.crosshair', { style: { display: 'none' } }));
   on('walk', () => {
-    walkB.classList.toggle('on', S.walk); pad.style.display = S.walk ? 'flex' : 'none'; cross.style.display = S.walk ? 'block' : 'none';
-    S.walk && !window.interior && toast(isTouch ? 'Walk mode — use the arrows to move, drag to look around' : 'Walk mode — click to look with the mouse · W A S D move · Shift run · C crouch · N fly · wheel speed · Esc exits', 5000);
+    walkB.classList.toggle('on', S.walk); pad.style.display = S.walk ? 'flex' : 'none';
+    S.walk && toast(isTouch ? 'Walk mode — use the arrows to move, drag to look around' : 'Walk mode — W A S D to move, drag to look around, Esc to exit', 4000);
   });
-  on('walkspeed', v => toast(`Walk speed ${Math.round(v * 100)}%`, 900));
   $('hud3d').replaceChildren(
     h('div.hudgroup', null, btn('Orbit', () => api3d.setCamera('iso'), { title: 'Reset to an overview' }), btn('Top', () => api3d.setCamera('top')), btn('Front', () => api3d.setCamera('front')), walkB),
     h('div.hudgroup', null, h('span', null, 'Walls'), selectInput([['auto', 'Cut-away'], ['full', 'All'], ['none', 'Hidden']], 'auto', v => api3d.setWallMode(v)),
@@ -782,7 +780,7 @@ function sunBar() {
 const compass = az => ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(az / 45) % 8];
 
 async function siteDialog() {
-  const { site, geocode, fetchBuildings, floorElev } = await import('./site.js');
+  const { site, geocode, fetchBuildings, floorElev, cornerSite } = await import('./site.js');
   const st = site(), save = patch => { S.doc.settings.site = { ...site(), ...patch }; commit(); draw(); };
   const results = h('div.siteresults'), info = h('p.hint');
   const q = h('input', { type: 'search', placeholder: 'Search an address or place…', value: st.address || '', onkeydown: e => e.key === 'Enter' && search() });
@@ -793,7 +791,9 @@ async function siteDialog() {
       results.replaceChildren(...(found.length ? found.map(f => h('button.siteresult', { onclick: () => { save({ lat: f.lat, lon: f.lon, address: f.name, buildings: null }); lat.value = f.lat.toFixed(5); lon.value = f.lon.toFixed(5); results.replaceChildren(); info.textContent = 'Location set. Load the neighbouring buildings to see their shadows.'; } }, f.name)) : [h('p.hint', null, 'Nothing found.')]));
     } catch { results.replaceChildren(h('p.hint', null, 'Could not reach OpenStreetMap. Check your connection.')); }
   }
-  const lat = numInput(st.lat.toFixed(5), v => save({ lat: v, buildings: null }), { step: 0.0001 }), lon = numInput(st.lon.toFixed(5), v => save({ lon: v, buildings: null }), { step: 0.0001 });
+  // nudging the unit within its block keeps the buildings; a jump further than 100 m needs them loaded again
+  const move = (la, lo) => { const s = site(), far = Math.hypot((la - s.lat) * 110540, (lo - s.lon) * 111320 * Math.cos(s.lat * Math.PI / 180)) > 100; save({ lat: la, lon: lo, ...(far && { buildings: null }) }); };
+  const lat = numInput(st.lat.toFixed(5), v => move(v, site().lon), { step: 0.0001 }), lon = numInput(st.lon.toFixed(5), v => move(site().lat, v), { step: 0.0001 });
   const zones = (Intl.supportedValuesOf?.('timeZone') || [st.tz]).map(z => [z, z.replace(/_/g, ' ')]);
   const north = h('input', { type: 'range', min: 0, max: 359, step: 1, value: st.north, oninput: () => { S.doc.settings.site = { ...site(), north: +north.value }; nlab.textContent = `${north.value}°`; draw(); touch(); }, onchange: () => commit() });
   const nlab = h('b', null, `${st.north}°`);
@@ -814,6 +814,14 @@ async function siteDialog() {
     catch { status.textContent = 'The buildings service did not answer. Try again in a minute.'; }
     load.disabled = false;
   });
+  // slide the unit into a corner of your own building (the footprint the site sits in)
+  const snap = bearing => {
+    const p = cornerSite(site(), ed.contentBounds(), bearing);
+    if (!p) { status.textContent = 'Load the buildings first, with the site inside your own building.'; return; }
+    move(p.lat, p.lon); lat.value = p.lat.toFixed(6); lon.value = p.lon.toFixed(6);
+    status.textContent = `Unit moved to the building's ${compass(bearing)} corner.`;
+  };
+  const corners = h('div.siterow', null, h('span', null, 'Put the unit in the corner:'), ...[315, 45, 225, 135].map(a => btn(compass(a), () => snap(a))));
   dialog('Site: where the unit is', h('div', null,
     h('p.hint', null, 'Puts the plan on the map so the sun comes from the right side at the right time, at your floor\'s height, with the neighbours\' shadows. Search, then turn the plan until the red arrow points north.'),
     h('div.siterow', null, q, btn('Search', search, { cls: 'primary' })), results, info,
@@ -823,7 +831,7 @@ async function siteDialog() {
     row('Floor', numInput(st.floor, v => save({ floor: Math.max(1, Math.round(v)) }), { min: 1, max: 200 })),
     row('Floor-to-floor height', lenInput(st.floorHeight, v => save({ floorHeight: v }), false)),
     h('p.hint', null, `Floor ${st.floor} puts your floor about ${fmtLen(floorElev(st), units())} above the street.`),
-    load, status,
+    load, corners, status,
     h('p.hint', null, 'Map data © OpenStreetMap contributors (ODbL).')), [{ label: 'Done', primary: true }]);
 }
 

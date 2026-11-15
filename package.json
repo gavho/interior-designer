@@ -5,8 +5,6 @@
   "type": "module",
   "description": "Browser-based 2D/3D floor plan and interior design tool",
   "scripts": {
-    "start": "node serve.mjs",
-    "hud": "cd hud && npm install && npm run build",
-    "hud:watch": "cd hud && npm run watch"
+    "start": "node serve.mjs"
   }
 }

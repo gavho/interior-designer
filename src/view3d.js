@@ -20,8 +20,6 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { sunPosition, zonedInstant, daylight } from './sun.js';
 import { site, floorElev, bearingDir, toPlan } from './site.js';
-import { walk, walkStep, look, standAt } from './walk.js';
-import { sb, initSandbox, sandboxFrame, primary, secondary, setSlot } from './sandbox.js';
 
 let renderer, scene, camera, controls, pane, sun, hemi, structure, itemsGroup, helpers, ground;
 let wallMode = 'auto', structSig = '', wallObjs = [], needFit = true;
@@ -31,6 +29,7 @@ let sky = null, context = null, contextSig = '', sunInfo = { az: 180, el: 45 };
 const today = new Date(), sunWhen = { date: `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`, minutes: 14 * 60 };
 let lastFrame = 0, wallVisSig = '', perfEl = null, dynScale = 1, slowFrames = 0, fastFrames = 0;
 const _dir = new THREE.Vector3();
+const walk = { yaw: 0, pitch: 0, keys: {} };
 /** On-screen walk controls (touch): hold a movement key down or let it go. */
 export function setWalkKey(code, down) { walk.keys[code] = down; }
 // shadows are re-rendered only when something that casts them changes, not every frame
@@ -355,7 +354,7 @@ function syncStructure() {
     const sh = new THREE.Shape(r.poly.map(p => new THREE.Vector2(p.x, p.y)));
     const m = new THREE.Mesh(new THREE.ShapeGeometry(sh).rotateX(Math.PI / 2), floorMaterial(r.meta.floor));
     m.position.y = 0.002; m.receiveShadow = true;
-    m.userData.roomId = r.id; structure.add(m);
+    structure.add(m);
   }
   const b = contentBounds(), c = { x: (b.x0 + b.x1) / 2, y: (b.y0 + b.y1) / 2 };
   for (const w of d.walls) {
@@ -363,7 +362,7 @@ function syncStructure() {
     const group = buildWall(w, g, d.openings.filter(o => o.wallId === w.id));
     const mid = mul(add(w.a, w.b), 0.5);
     wallObjs.push({ group, mid, n: dot(sub(mid, c), g.n) >= 0 ? g.n : mul(g.n, -1) });
-    group.userData.wallId = w.id; structure.add(group);
+    structure.add(group);
   }
   const R = Math.max(b.x1 - b.x0, b.y1 - b.y0, 4);
   syncContext(b, c, R);
@@ -382,18 +381,25 @@ function syncContext(b, c, R) {
   if (context) { scene.remove(context); context.traverse(o => o.geometry?.dispose()); }
   context = new THREE.Group(); scene.add(context);
   const facade = mat('#b9bcc0'), slab = mat('#9fa3a8');
-  if (elev > 0.2) { // the floors below yours: a plain block under the plan
+  const own = st.buildings?.find(bd => bd.own);
+  if (elev > 0.2 && !own) { // the floors below yours: a plain block under the plan
     const m = box(b.x1 - b.x0 + 0.4, elev - 0.05, b.y1 - b.y0 + 0.4, c.x, -elev / 2 - 0.05, c.y, slab);
     context.add(m);
   }
+  const extrude = (pts, from, to, material) => {
+    const shape = new THREE.Shape(pts.map(q => new THREE.Vector2(q.x, -q.y)));
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: to - from, bevelEnabled: false }).rotateX(-Math.PI / 2);
+    const m = new THREE.Mesh(geo, material); m.position.y = from - elev; m.castShadow = m.receiveShadow = true;
+    context.add(m); return m;
+  };
   for (const bd of st.buildings || []) {
     const pts = bd.pts.map(([la, lo]) => toPlan(la, lo, st, c));
     if (pts.length < 3) continue;
-    const shape = new THREE.Shape(pts.map(q => new THREE.Vector2(q.x, -q.y)));
-    const geo = new THREE.ExtrudeGeometry(shape, { depth: bd.h, bevelEnabled: false }).rotateX(-Math.PI / 2);
-    const m = new THREE.Mesh(geo, facade); m.position.y = -elev; m.castShadow = m.receiveShadow = true;
-    m.userData.neighbour = true;
-    context.add(m);
+    if (!bd.own) { extrude(pts, 0, bd.h, facade).userData.neighbour = true; continue; }
+    // your own building: the floors below the unit always, the ones above with the neighbours; your storey stays open
+    if (elev > 0.2) extrude(pts, 0, elev - 0.05, slab);
+    const top = elev + st.floorHeight;
+    if (bd.h > top + 0.5) extrude(pts, top, Math.max(bd.h, top + 1), facade).userData.neighbour = true;
   }
   context.traverse(o => { o.updateMatrix(); o.matrixAutoUpdate = false; });
   showContext();
@@ -440,19 +446,13 @@ export function setCamera(mode) {
 
 export function setWalk(v) {
   if (S.walk === v) return;
-  S.walk = v; controls.enabled = !v; walk.keys = {}; walk.vx = walk.vz = walk.vy = 0; walk.fly = false; walk.eye = 1.6;
+  S.walk = v; controls.enabled = !v; walk.keys = {};
   if (v) {
     const dir = camera.getWorldDirection(new THREE.Vector3());
     walk.yaw = Math.atan2(-dir.x, -dir.z); walk.pitch = 0;
-    const big = [...S.rooms].sort((a, b) => b.area - a.area)[0], p = standAt(...(big ? [big.c.x, big.c.y] : [controls.target.x, controls.target.z]));
+    const big = [...S.rooms].sort((a, b) => b.area - a.area)[0], p = big ? big.c : { x: controls.target.x, y: controls.target.z };
     camera.position.set(p.x, 1.6, p.y);
-    camera.fov = S.prefs.walkFov || 70;
-  } else {
-    if (document.pointerLockElement) document.exitPointerLock();
-    camera.fov = 50;
-    const dir = camera.getWorldDirection(new THREE.Vector3()); controls.target.copy(camera.position).addScaledVector(dir, 3); camera.position.y = Math.max(camera.position.y, 1.6); controls.update();
-  }
-  camera.updateProjectionMatrix();
+  } else { const dir = camera.getWorldDirection(new THREE.Vector3()); controls.target.copy(camera.position).addScaledVector(dir, 3); camera.position.y = Math.max(camera.position.y, 1.6); controls.update(); }
   showContext();
   emit('walk');
 }
@@ -512,19 +512,19 @@ export function setSunTime(patch) { Object.assign(sunWhen, patch); placeSun(); }
 export const getSunTime = () => ({ ...sunWhen, ...sunInfo });
 export const setSky = v => { if (sky) sky.visible = v; };
 export const setShadows = v => { renderer.shadowMap.enabled = v; sun.castShadow = v; mats.forEach(m => (m.needsUpdate = true)); floorTex.forEach(m => (m.needsUpdate = true)); shadowsDirty(); };
-/** Where the walker stands and faces (plan coordinates; yaw 0 looks toward −y on the plan). */
-export const playerPose = () => ({ x: camera.position.x, y: camera.position.z, yaw: walk.yaw, fly: walk.fly, speed: walk.speed });
-export function teleport(x, y) { const p = standAt(x, y); camera.position.x = p.x; camera.position.z = p.y; walk.vx = walk.vz = 0; }
-export const setFov = f => { if (S.walk) { camera.fov = f; camera.updateProjectionMatrix(); } };
-/** Fly / walk toggle while walking (no collision, Space up, C down). */
-export const toggleFly = () => { walk.fly = !walk.fly; walk.vy = 0; return walk.fly; };
 export function snapshot() { if (ptActive) return renderer.domElement.toDataURL('image/png'); helpers.visible = false; quality === 'high' && composer ? composer.render() : renderer.render(scene, camera); const url = renderer.domElement.toDataURL('image/png'); helpers.visible = true; return url; }
 
 function frame(now) {
   requestAnimationFrame(frame);
   if (!pane.offsetWidth || !S.doc) return;
   const ms = now - lastFrame, dt = Math.min(0.05, ms / 1000); lastFrame = now;
-  if (S.walk) { walkStep(camera, dt); sandboxFrame(); } else controls.update();
+  if (S.walk) {
+    const k = walk.keys, f = (k.KeyW || k.ArrowUp ? 1 : 0) - (k.KeyS || k.ArrowDown ? 1 : 0), s = (k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0);
+    walk.yaw += ((k.ArrowLeft ? 1 : 0) - (k.ArrowRight ? 1 : 0)) * dt * 1.8;
+    const sp = (k.ShiftLeft ? 4 : 1.8) * dt, sy = Math.sin(walk.yaw), cy = Math.cos(walk.yaw);
+    camera.position.x += (-sy * f + cy * s) * sp; camera.position.z += (-cy * f - sy * s) * sp;
+    camera.rotation.set(walk.pitch, walk.yaw, 0, 'YXZ');
+  } else controls.update();
   if (ptActive) { pt.renderSample(); return; }
   const above = camera.position.y > 0 && !S.walk, steep = Math.abs(camera.getWorldDirection(_dir).y) > 0.97;
   let vis = '';
@@ -659,15 +659,8 @@ export function init3d(el) {
   const cast = e => { const r = cvs.getBoundingClientRect(); ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera); };
   const onFloor = y => { floor.constant = -y; const p = ray.ray.intersectPlane(floor, new THREE.Vector3()); return p && { x: p.x, y: p.z }; };
   cvs.addEventListener('pointerdown', e => {
-    if (e.button !== 0 && !(S.walk && document.pointerLockElement)) return;
-    if (S.walk) {
-      if (e.pointerType === 'mouse') { // mouse: captured look, like a game; once captured the buttons build
-        if (!document.pointerLockElement) cvs.requestPointerLock?.()?.catch?.(() => {});
-        else if (sb.enabled && sb.hud) { if (e.button === 0) primary(); else if (e.button === 2) secondary(); }
-        return;
-      }
-      act = { t: 'look', x: e.clientX, y: e.clientY }; cvs.setPointerCapture(e.pointerId); return;
-    }
+    if (e.button !== 0) return;
+    if (S.walk) { act = { t: 'look', x: e.clientX, y: e.clientY }; cvs.setPointerCapture(e.pointerId); return; }
     cast(e);
     const hit = ray.intersectObjects(itemsGroup.children, true)[0];
     let o = hit?.object; while (o && !o.userData.itemId) o = o.parent;
@@ -679,13 +672,9 @@ export function init3d(el) {
       if (p) { act = { ...act, t: 'drag', py: hit.point.y, off: { x: it.x - p.x, y: it.y - p.y }, moved: false, x0: it.x, y0: it.y, riders: riders([it]).map(r => ({ it: r, x: r.x, y: r.y })) }; controls.enabled = false; cvs.setPointerCapture(e.pointerId); }
     }
   });
-  document.addEventListener('mousemove', e => { if (S.walk && document.pointerLockElement === cvs) look(e.movementX, e.movementY); });
-  document.addEventListener('pointerlockchange', () => emit('walklock', document.pointerLockElement === cvs));
-  cvs.addEventListener('contextmenu', e => { if (S.walk) e.preventDefault(); });
-  cvs.addEventListener('wheel', e => { if (!S.walk) return; e.preventDefault(); if (sb.enabled && sb.hud && sb.mode === 'build') { setSlot(sb.slot + (e.deltaY > 0 ? 1 : -1)); return; } walk.speed = clamp(walk.speed * (e.deltaY < 0 ? 1.15 : 1 / 1.15), 0.3, 4); emit('walkspeed', walk.speed); }, { passive: false });
   cvs.addEventListener('pointermove', e => {
     if (!act) return;
-    if (act.t === 'look') { look((e.clientX - act.x) * 1.8, (e.clientY - act.y) * 1.8); act.x = e.clientX; act.y = e.clientY; }
+    if (act.t === 'look') { walk.yaw -= (e.clientX - act.x) * 0.004; walk.pitch = clamp(walk.pitch - (e.clientY - act.y) * 0.004, -1.2, 1.2); act.x = e.clientX; act.y = e.clientY; }
     else if (act.t === 'drag') {
       if (!act.moved && Math.hypot(e.clientX - act.x, e.clientY - act.y) < 4) return;
       cast(e); const p = onFloor(act.py); if (!p) return;
@@ -722,15 +711,11 @@ export function init3d(el) {
   }
   const key = e => {
     if (e.code === 'F3' && e.type === 'keydown') { togglePerf(); e.preventDefault(); return; }
-    if (!S.walk || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
-    if ((e.ctrlKey || e.metaKey) && e.type === 'keydown') return; // Ctrl+Z etc. still reach the shortcuts (Ctrl is not crouch: Ctrl+W would close the tab)
-    if (e.code === 'KeyN' && e.type === 'keydown' && !e.repeat) { emit('toast', toggleFly() ? 'Fly: Space up, C down (N to walk)' : 'Walking'); e.preventDefault(); return; }
-    if (/^(Key[WASDC]|Arrow|Shift|Space)/.test(e.code)) { walk.keys[e.code] = e.type === 'keydown'; e.preventDefault(); }
+    if (!S.walk) return;
+    if (/^(Key[WASD]|Arrow|Shift)/.test(e.code)) { walk.keys[e.code] = e.type === 'keydown'; e.preventDefault(); }
   };
-  addEventListener('blur', () => { walk.keys = {}; }); // no stuck keys after Alt-Tab
   window.addEventListener('keydown', key); window.addEventListener('keyup', key);
 
-  initSandbox({ camera, scene, itemsGroup, structure, buildItem, shadowsDirty });
   resize(); sync();
   requestAnimationFrame(frame);
 }

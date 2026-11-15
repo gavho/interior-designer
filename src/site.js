@@ -28,7 +28,29 @@ export async function geocode(q) {
   return (await r.json()).map(x => ({ name: x.display_name, lat: +x.lat, lon: +x.lon }));
 }
 
-/** Buildings within `radius` m as { pts: [[lat, lon]…], h } — the one at the site itself (your own building) left out. */
+/** Plan metres → map point: the inverse of `toPlan`. */
+export function toMap(p, s, origin) {
+  const dx = p.x - origin.x, dy = p.y - origin.y, E = bearingDir(90, s.north), N = bearingDir(0, s.north);
+  const e = dx * E.x + dy * E.y, n = dx * N.x + dy * N.y; // E and N are unit and perpendicular
+  return { lat: s.lat + n / 110540, lon: s.lon + e / (111320 * Math.cos(rad(s.lat))) };
+}
+
+/**
+ * Where the site should be so the plan's outermost corner towards `bearing` (315 = north-west) lands on your building's
+ * outermost corner that way. `bounds` is the plan's content box; returns the new { lat, lon } or null without a footprint.
+ */
+export function cornerSite(s, bounds, bearing) {
+  const own = s.buildings?.find(b => b.own);
+  if (!own) return null;
+  const c = { x: (bounds.x0 + bounds.x1) / 2, y: (bounds.y0 + bounds.y1) / 2 }, d = bearingDir(bearing, s.north);
+  const far = pts => pts.reduce((m, p) => (p.x * d.x + p.y * d.y > m.x * d.x + m.y * d.y ? p : m));
+  const target = far(own.pts.map(([la, lo]) => toPlan(la, lo, s, c)));
+  const corner = far([{ x: bounds.x0, y: bounds.y0 }, { x: bounds.x1, y: bounds.y0 }, { x: bounds.x0, y: bounds.y1 }, { x: bounds.x1, y: bounds.y1 }]);
+  // moving the site by −(target − corner) in plan space slides the building so its corner meets the plan's
+  return toMap({ x: c.x + corner.x - target.x, y: c.y + corner.y - target.y }, s, c);
+}
+
+/** Buildings within `radius` m as { pts: [[lat, lon]…], h } — the one at the site itself (your own building) marked `own`. */
 export async function fetchBuildings(lat, lon, radius = 250) {
   const q = `[out:json][timeout:25];(way["building"](around:${radius},${lat},${lon});relation["building"](around:${radius},${lat},${lon}););out geom;`;
   const r = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
@@ -39,8 +61,9 @@ export async function fetchBuildings(lat, lon, radius = 250) {
     if (!ring || ring.length < 3) continue;
     const t = el.tags || {}, h = parseFloat(t.height) || (parseFloat(t['building:levels']) ? parseFloat(t['building:levels']) * 3.4 : 0) || 10;
     const pts = ring.map(g => [+g.lat.toFixed(6), +g.lon.toFixed(6)]);
-    if (inside([lat, lon], pts)) continue;
-    out.push({ pts, h: +h.toFixed(1), name: t.name || '' });
+    const b = { pts, h: +h.toFixed(1), name: t.name || '' };
+    if (inside([lat, lon], pts) && !out.some(o => o.own)) b.own = true;
+    out.push(b);
   }
   return out;
 }
@@ -60,4 +83,6 @@ function inside([y, x], pts) {
   console.assert(e.x > 70 && Math.abs(e.y) < 1e-6 && n.y < -100 && Math.abs(n.x) < 1e-6, 'site: map to plan axes', e, n);
   const r = toPlan(40, -79.999, { ...s, north: 90 }, o); // up is east: east lands up
   console.assert(r.y < -70 && Math.abs(r.x) < 1e-6, 'site: north rotation', r);
+  const m = toMap(toPlan(40.0003, -79.9996, { ...s, north: 30 }, o), { ...s, north: 30 }, o);
+  console.assert(Math.abs(m.lat - 40.0003) < 1e-9 && Math.abs(m.lon + 79.9996) < 1e-9, 'site: map round trip', m);
 }

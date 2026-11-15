@@ -11,7 +11,7 @@ let api3d = null;
 function onKey(e) {
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || document.querySelector('.modal-back');
   if (typing) { if (e.key === 'Escape') e.target.blur?.(); return; }
-  if (S.walk) { if (e.key === 'Escape') api3d?.setWalk(false); if (!(e.ctrlKey || e.metaKey) || !/^[zy]$/i.test(e.key)) return; } // only undo / redo while walking
+  if (S.walk) { if (e.key === 'Escape') api3d?.setWalk(false); return; }
   if (handleKey(e)) { e.preventDefault(); return; }
   const k = e.key.toLowerCase(), mod = e.ctrlKey || e.metaKey, step = S.doc.settings.snap * (e.shiftKey ? 12 : 1);
   const done = () => e.preventDefault();
@@ -52,22 +52,10 @@ async function start() {
     api3d = await import('./view3d.js');
     api3d.init3d(document.getElementById('pane3d'));
     set3d(api3d);
-    loadHud();
   } catch (err) {
     console.error(err);
     document.getElementById('hud3d').textContent = '3D view unavailable - it needs an internet connection to load three.js.';
   }
-}
-// The walk HUD is a separate React bundle (hud/, built with `npm run hud`); where it isn't built (GitHub Pages) walk mode keeps the plain controls.
-async function loadHud() {
-  try {
-    const url = new URL('../hud/dist/hud.js', import.meta.url);
-    if (!(await fetch(url, { method: 'HEAD' })).ok) return;
-    const { makeBridge } = await import('./bridge.js');
-    window.interior = makeBridge(api3d);
-    document.head.append(Object.assign(document.createElement('link'), { rel: 'stylesheet', href: new URL('../hud/dist/hud.css', import.meta.url).href }));
-    await import(url.href);
-  } catch (err) { console.warn('Walk HUD not loaded:', err); }
 }
 start();
 // offline support / installable desktop app (not needed inside the Electron shell, which bundles everything)
