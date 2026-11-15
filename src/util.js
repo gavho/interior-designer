@@ -1,5 +1,7 @@
 // Math, geometry, unit and DOM helpers shared by every module.
 
+/** A phone-sized touch screen: gets lighter 3D defaults (fewer lights, smaller shadows, lower resolution). */
+export const phone = typeof matchMedia === 'function' && matchMedia('(pointer: coarse) and (max-width: 1000px)').matches;
 export const uid = (p = 'o') => p + Math.random().toString(36).slice(2, 10);
 export const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export const lerp = (a, b, t) => a + (b - a) * t;

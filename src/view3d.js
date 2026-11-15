@@ -10,7 +10,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { S, on, emit, touch, commit, select, isSel, find } from './state.js';
-import { rad, lerp, clamp, dot, sub, mul, add, pointInPoly } from './util.js';
+import { rad, lerp, clamp, dot, sub, mul, add, pointInPoly, phone } from './util.js';
 import { partsFor, resolveColor, getDef, lightOf } from './catalog.js';
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 import { getFloor, floorCanvas, getFinish, finishCanvas, grainCanvas } from './materials.js';
@@ -664,7 +664,7 @@ function adapt(ms) {
   if (ms > 20) { fastFrames = 0; if (++slowFrames > 20 && dynScale > 0.6) { dynScale = Math.max(0.6, dynScale - 0.1); slowFrames = 0; applyPixelRatio(); } }
   else if (ms < 13) { slowFrames = 0; if (++fastFrames > 180 && dynScale < 1) { dynScale = Math.min(1, dynScale + 0.1); fastFrames = 0; applyPixelRatio(); } }
 }
-const baseRatio = () => Math.min(window.devicePixelRatio, quality === 'high' ? 2.5 : 1.5);
+const baseRatio = () => Math.min(window.devicePixelRatio, quality === 'high' ? 2.5 : phone ? 1.25 : 1.5);
 function applyPixelRatio() { renderer.setPixelRatio(baseRatio() * dynScale); resize(); }
 
 // F3: frame time, draw calls and triangles
@@ -686,7 +686,7 @@ export function setQuality(q) {
   quality = q;
   const hi = q === 'high';
   renderer.setPixelRatio(baseRatio() * dynScale);
-  sun.shadow.mapSize.set(hi ? 4096 : 2048, hi ? 4096 : 2048); sun.shadow.map?.dispose(); sun.shadow.map = null; shadowsDirty();
+  const sm = hi ? 4096 : phone ? 1024 : 2048; sun.shadow.mapSize.set(sm, sm); sun.shadow.map?.dispose(); sun.shadow.map = null; shadowsDirty();
   if (hi && !composer) {
     const sz = renderer.getDrawingBufferSize(new THREE.Vector2());
     composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(sz.x, sz.y, { samples: 4, type: THREE.HalfFloatType }));
@@ -754,7 +754,7 @@ export function init3d(el) {
   controls.addEventListener('change', () => { if (ptActive) pt.updateCamera(); });
   controls.maxPolarAngle = Math.PI / 2 - 0.02; controls.minDistance = 0.08; controls.maxDistance = 600; // close enough to inspect a keyboard
   hemi = new THREE.HemisphereLight(0xffffff, 0xcfc8bb, 1.0);
-  sun = new THREE.DirectionalLight(0xfff3dc, 2.4); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
+  sun = new THREE.DirectionalLight(0xfff3dc, 2.4); sun.castShadow = true; sun.shadow.mapSize.setScalar(phone ? 1024 : 2048); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
   ground = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#dfe4e8', roughness: 1 }));
   ground.receiveShadow = true;
   structure = new THREE.Group(); itemsGroup = new THREE.Group(); helpers = new THREE.Group();  scene.add(hemi, sun, sun.target, new THREE.AmbientLight(0xffffff, 0.15), ground, structure, itemsGroup, helpers);

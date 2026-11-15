@@ -1,6 +1,6 @@
 // Central document store: the plan model, derived geometry, selection, undo history and autosave.
 import { migrate } from './migrate.js';
-import { uid, computeRooms, computeWallGeom, polyArea, polyPerimeter, polyLabelPoint, polyBBox, pointInPoly } from './util.js';
+import { phone, uid, computeRooms, computeWallGeom, polyArea, polyPerimeter, polyLabelPoint, polyBBox, pointInPoly } from './util.js';
 
 export const S = {
   doc: null,
@@ -13,7 +13,7 @@ export const S = {
   version: 0,
   library: [],       // user-saved furniture templates
   walk: false,
-  prefs: { snapGrid: true, snapAngle: true, magnet: true, showDims: true, showClear: false, showIssues: true, showLabels: true, showElec: true, view: 'split' },
+  prefs: { snapGrid: true, snapAngle: true, magnet: true, showDims: true, showClear: false, showIssues: true, showLabels: true, showElec: true, view: 'split', ...(phone && { lights: 'off' }) },
 };
 
 const listeners = {};

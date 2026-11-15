@@ -1,7 +1,7 @@
 // Application chrome: top bar, tool rail, catalogue / build / style / objects / insights tabs,
 // the properties inspector, dialogs, context menu and toasts.
 import { S, on, emit, commit, touch, undo, redo, canUndo, canRedo, select, selOf, find, isSel, setTool, setPref, setDoc, newDoc, exportProject, parseProject, exportBackup, importBackup, restoreSnapshot, kvGet, kvSet, saveLibrary, listProjects, saveSlot, openSlot, deleteSlot } from './state.js';
-import { h, uid, fmtLen, parseLen, fmtArea, fmtMoney, download, readAsDataURL, pickFile, normDeg, dist, clamp, add, sub, mul, rot } from './util.js';
+import { h, uid, fmtLen, parseLen, fmtArea, fmtMoney, download, readAsDataURL, pickFile, normDeg, dist, clamp, add, sub, mul, rot, phone } from './util.js';
 import { CATALOG, CATEGORIES, getDef, thumbnail, lightOf, KELVIN, MODULE_TYPES, moduleBounds, moduleLayout } from './catalog.js';
 import { FLOORS, PALETTES, SWATCHES, floorCanvas, WALL_FINISHES, WOODS, COUNTERS } from './materials.js';
 import * as ops from './ops.js';
@@ -885,7 +885,7 @@ async function siteDialog() {
   draw();
   const status = h('p.hint', null, st.buildings ? `${st.buildings.length} neighbouring buildings loaded.` : 'No neighbouring buildings loaded.');
   const load = btn('Load neighbouring buildings', async () => {
-    const r = site().radius || 250;
+    const r = Math.min(site().radius || 250, phone ? 500 : Infinity);
     load.disabled = true; status.textContent = `Asking OpenStreetMap for buildings within ${r} m… (this can take up to a minute)`;
     try { const b = await fetchBuildings(site().lat, site().lon, r); save({ buildings: b }); status.textContent = `${b.length} buildings loaded; they cast shadows on the unit.`; }
     catch { status.textContent = 'The buildings service did not answer. Try again in a minute.'; }
@@ -909,7 +909,7 @@ async function siteDialog() {
     row('Storeys in your building', numInput(st.storeys || 0, v => save({ storeys: Math.max(0, Math.round(v)) }), { min: 0, max: 200, title: '0 = use OpenStreetMap\'s height' })),
     row('Floor-to-floor height', lenInput(st.floorHeight, v => save({ floorHeight: v }), false)),
     h('p.hint', null, `Floor ${st.floor} puts your floor about ${fmtLen(floorElev(st), units())} above the street.`),
-    row('Buildings within', selectInput([['250', '250 m'], ['500', '500 m'], ['1000', '1 km'], ['1500', '1.5 km']], String(st.radius || 250), v => { save({ radius: +v }); status.textContent = 'Load the buildings again to fill the wider area.'; })),
+    row('Buildings within', selectInput([['250', '250 m'], ['500', '500 m'], ...(phone ? [] : [['1000', '1 km'], ['1500', '1.5 km']])], String(Math.min(st.radius || 250, phone ? 500 : 1500)), v => { save({ radius: +v }); status.textContent = 'Load the buildings again to fill the wider area.'; })),
     load, corners, status,
     row('Ground', selectInput([['', 'Plain'], ['satellite', 'Satellite imagery'], ['map', 'Street map']], st.imagery || '', v => save({ imagery: v || null }))),
     row('Ground detail', selectInput([['17', 'Low (~1 m)'], ['18', 'Medium (~50 cm)'], ['19', 'High (~25 cm)']], String(st.detail || 17), v => save({ detail: +v }))),

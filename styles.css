@@ -255,6 +255,10 @@ kbd { font: 11px ui-monospace, Consolas, monospace; background: #eef0f3; border:
   #app.drawerleft #left, #app.drawerright #right { transform: none; visibility: visible; }
   #app[data-view="split"] #stage { flex-direction: column; }
   #app[data-view="split"] #pane3d { border-left: 0; border-top: 1px solid var(--line); }
+  /* the 3D toolbar: one row you swipe sideways, instead of stacking over the view */
+  #hud3d { flex-wrap: nowrap; overflow-x: auto; pointer-events: auto; scrollbar-width: none; padding-bottom: 2px; }
+  #hud3d::-webkit-scrollbar { display: none; }
+  #hud3d .hudgroup { flex: none; white-space: nowrap; }
 }
 
 /* ---- My projects, retailer colours ---- */
