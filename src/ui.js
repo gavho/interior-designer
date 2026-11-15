@@ -2,7 +2,7 @@
 // the properties inspector, dialogs, context menu and toasts.
 import { S, on, emit, commit, touch, undo, redo, canUndo, canRedo, select, selOf, find, isSel, setTool, setPref, setDoc, newDoc, exportProject, parseProject, exportBackup, importBackup, restoreSnapshot, kvGet, kvSet, saveLibrary, listProjects, saveSlot, openSlot, deleteSlot } from './state.js';
 import { h, uid, fmtLen, parseLen, fmtArea, fmtMoney, download, readAsDataURL, pickFile, normDeg, dist, clamp, add, sub, mul, rot } from './util.js';
-import { CATALOG, CATEGORIES, getDef, thumbnail, MODULE_TYPES, moduleBounds } from './catalog.js';
+import { CATALOG, CATEGORIES, getDef, thumbnail, MODULE_TYPES, moduleBounds, moduleLayout } from './catalog.js';
 import { FLOORS, PALETTES, SWATCHES, floorCanvas, WALL_FINISHES, WOODS, COUNTERS } from './materials.js';
 import * as ops from './ops.js';
 import { analyze } from './analysis.js';
@@ -378,13 +378,15 @@ const MOD_PRESETS = {
   'Two loveseats facing': [[0, 0, 'seat', 0], [1, 0, 'seat', 0], [0, 1, 'ottoman', 0], [1, 1, 'ottoman', 0], [0, 2, 'seat', 2], [1, 2, 'seat', 2]],
   'Pit / daybed': [[0, 0, 'seat', 0], [1, 0, 'seat', 0], [0, 1, 'ottoman', 0], [1, 1, 'ottoman', 0], [0, 2, 'seat', 2], [1, 2, 'seat', 2]],
 };
-/** Replace the pieces; resize the footprint to fit and keep the existing pieces where they are on the plan. */
+/** Replace the pieces; resize the footprint to the real pieces and keep the ones that stay where they are on the plan. */
 function setModules(it, def, mods) {
   if (!mods.length) { toast('A sofa needs at least one piece'); return; }
-  const cw = it.w / (moduleBounds(it.modules).x1 - moduleBounds(it.modules).x0 + 1), cd = it.d / (moduleBounds(it.modules).y1 - moduleBounds(it.modules).y0 + 1);
-  const B0 = moduleBounds(it.modules), B1 = moduleBounds(mods);
-  const shift = rot({ x: ((B1.x0 + B1.x1) - (B0.x0 + B0.x1)) / 2 * cw, y: ((B1.y0 + B1.y1) - (B0.y0 + B0.y1)) / 2 * cd }, it.rot);
-  it.modules = mods; it.w = (B1.x1 - B1.x0 + 1) * cw; it.d = (B1.y1 - B1.y0 + 1) * cd; it.x += shift.x; it.y += shift.y;
+  const before = moduleLayout(it), sx = it.w / before.W, sz = it.d / before.D;
+  const after = moduleLayout({ ...it, modules: mods });
+  const key = m => m.x + ',' + m.y, old = new Map(before.info.map(i => [key(i.m), i])), keep = after.info.find(i => old.has(key(i.m)));
+  const o = keep ? old.get(key(keep.m)) : { cx: 0, cz: 0 }, n = keep || { cx: 0, cz: 0 };
+  const shift = rot({ x: (o.cx - n.cx) * sx, y: (o.cz - n.cz) * sz }, it.rot);
+  it.modules = mods; it.w = after.W * sx; it.d = after.D * sz; it.x += shift.x; it.y += shift.y;
   commit();
 }
 function moduleEditor(it, def) {
@@ -405,7 +407,7 @@ function moduleEditor(it, def) {
       btn('Rotate ⟳', () => { if (!sel) return toast('Tap a piece first'); setModules(it, def, mods.map(m => (m === sel ? { ...m, r: (m.r + 3) % 4 } : m))); }, { disabled: !sel || sel.t === 'ottoman' }),
       btn('Remove', () => { if (!sel) return; modCell = null; setModules(it, def, mods.filter(m => m !== sel)); }, { disabled: !sel, cls: 'danger' })),
     row('Layout', selectInput([['', 'Choose a layout…'], ...Object.keys(MOD_PRESETS).map(k => [k, k])], '', v => { if (!v) return; modCell = null; setModules(it, def, MOD_PRESETS[v].map(([x, y, t, r]) => ({ x, y, t, r }))); })),
-    check('Arms on open ends', it.arms !== false, edit(v => (it.arms = v))),
+    check('Arms on open ends', it.arms !== false, v => { const L0 = moduleLayout(it), sx = it.w / L0.W, sz = it.d / L0.D; it.arms = v; const L1 = moduleLayout(it); it.w = L1.W * sx; it.d = L1.D * sz; commit(); }),
     h('p.hint', null, `Uses ${count('seat') + count('corner')} seat${count('seat') + count('corner') === 1 ? '' : 's'}${count('corner') ? ` (${count('corner')} corner)` : ''} and ${count('ottoman')} ottoman${count('ottoman') === 1 ? '' : 's'}: ${L(it.w)} × ${L(it.d)}. The set comes with 4 seats and 2 ottomans${count('seat') + count('corner') > 4 || count('ottoman') > 2 || count('corner') ? '; this layout needs extra or different pieces' : ''}.`));
 }
 
