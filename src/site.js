@@ -52,11 +52,9 @@ export function cornerSite(s, bounds, bearing) {
 
 /** Buildings within `radius` m as { pts: [[lat, lon]…], h } — the one at the site itself (your own building) marked `own`. */
 export async function fetchBuildings(lat, lon, radius = 250) {
-  const q = `[out:json][timeout:25];(way["building"](around:${radius},${lat},${lon});relation["building"](around:${radius},${lat},${lon}););out geom;`;
-  const r = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
-  if (!r.ok) throw new Error('overpass');
+  const q = `[out:json][timeout:${radius > 500 ? 90 : 25}];(way["building"](around:${radius},${lat},${lon});relation["building"](around:${radius},${lat},${lon}););out geom;`;
   const out = [];
-  for (const el of (await r.json()).elements) {
+  for (const el of (await overpass(q)).elements) {
     const ring = el.geometry || el.members?.find(m => m.role === 'outer')?.geometry;
     if (!ring || ring.length < 3) continue;
     const t = el.tags || {}, h = parseFloat(t.height) || (parseFloat(t['building:levels']) ? parseFloat(t['building:levels']) * 3.4 : 0) || 10;
@@ -67,6 +65,21 @@ export async function fetchBuildings(lat, lon, radius = 250) {
   }
   return out;
 }
+// the main Overpass server is often full: try the public mirrors, then go round once more after a pause
+const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
+async function overpass(q) {
+  for (let round = 0; round < 2; round++) {
+    for (const url of OVERPASS) {
+      try {
+        const r = await fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+        if (r.ok) return await r.json();
+      } catch {}
+    }
+    await new Promise(ok => setTimeout(ok, 4000));
+  }
+  throw new Error('overpass');
+}
+
 // ---- ground imagery: map tiles around the site, stitched into one picture to lay under the buildings ----
 export const IMAGERY = {
   satellite: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -75,9 +88,14 @@ export const IMAGERY = {
 const tileXY = (lat, lon, z) => { const n = 2 ** z, s = Math.sin(rad(lat)); return { x: ((lon + 180) / 360) * n, y: (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * n }; };
 const tileLatLon = (x, y, z) => { const n = 2 ** z; return { lat: (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / n))) * 180) / Math.PI, lon: (x / n) * 360 - 180 }; };
 
-/** A low-res picture of the ground `radius` m around a point: { canvas, corners: [nw, ne, se, sw] as { lat, lon } }. */
+/**
+ * A picture of the ground `radius` m around a point: { canvas, corners: [nw, ne, se, sw] as { lat, lon } }. `z` is the most
+ * detail wanted (17 ≈ 1 m a pixel, 19 ≈ 25 cm); it is lowered as needed to keep the picture within 4096 pixels across.
+ */
 export async function fetchImagery(lat, lon, kind = 'satellite', radius = 350, z = 17) {
-  const src = IMAGERY[kind] || IMAGERY.satellite, c = tileXY(lat, lon, z), span = radius / ((156543.03 * Math.cos(rad(lat))) / 2 ** z) / 256; // radius in tiles
+  const tiles = z => radius / ((156543.03 * Math.cos(rad(lat))) / 2 ** z) / 256; // radius in tiles
+  while (z > 14 && tiles(z) > 7.5) z--;
+  const src = IMAGERY[kind] || IMAGERY.satellite, c = tileXY(lat, lon, z), span = tiles(z);
   const x0 = Math.floor(c.x - span), x1 = Math.floor(c.x + span), y0 = Math.floor(c.y - span), y1 = Math.floor(c.y + span);
   const canvas = document.createElement('canvas'); canvas.width = (x1 - x0 + 1) * 256; canvas.height = (y1 - y0 + 1) * 256;
   const g = canvas.getContext('2d'), jobs = [];

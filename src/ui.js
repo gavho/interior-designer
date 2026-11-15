@@ -766,16 +766,31 @@ function sunBar() {
   const stop = () => { clearInterval(timer); timer = 0; play.textContent = '▶'; };
   on('sun', p => { label.textContent = `${hhmm(p.minutes)} · sun ${p.el > 0 ? `${Math.round(p.el)}° up, ${compass(p.az)}` : 'down'}`; if (+time.value !== p.minutes) time.value = p.minutes; if (date.value !== p.date) date.value = p.date; });
   setTimeout(() => api3d.setSunTime({}), 0); // fill in the read-out
+  let key = null;
+  const off = () => { api3d.clearSunHours(); hoursB.classList.remove('on'); key?.remove(); key = null; };
   const hoursB = btn('Sun hours', async () => {
-    if (hoursB.classList.contains('on')) { api3d.clearSunHours(); hoursB.classList.remove('on'); return; }
+    if (hoursB.classList.contains('on')) return off();
     hoursB.disabled = true; hoursB.textContent = 'Working…';
     const r = await api3d.sunHours(f => (hoursB.textContent = `${Math.round(f * 100)}%`));
     hoursB.disabled = false; hoursB.textContent = 'Sun hours';
     if (!r) return toast('The sun does not rise on that day here');
-    hoursB.classList.add('on'); toast(`Direct sun on the floor that day: up to ${r.max.toFixed(1)} h (average ${r.avg.toFixed(1)} h of ${r.day.toFixed(1)} h daylight). Blue = none, yellow = 6 h+`, 6000);
-  }, { title: 'Map how many hours of direct sun each spot of floor gets on this date' });
-  on('doc', () => hoursB.classList.remove('on'));
+    hoursB.classList.add('on'); key = sunKey(r, date.value, off); $('pane3d').append(key);
+  }, { title: 'Map how many hours of direct sun each spot of floor and furniture gets on this date' });
+  on('doc', () => { hoursB.classList.remove('on'); key?.remove(); key = null; });
   return h('div.hudgroup.sunbar', null, h('span', null, 'Sun'), date, time, play, label, hoursB, btn('Site…', siteDialog, { title: 'Address, north and which floor the unit is on' }));
+}
+// the key to the sun-hours colours, with each room's share of sun
+function sunKey(r, day, close) {
+  const rgb = c => `rgb(${c.join(',')})`, full = api3d.SUN_FULL, when = new Date(day + 'T12:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  const scale = h('div.sunscale', { style: { background: `linear-gradient(to right, ${api3d.SUN_RAMP.map(rgb).join(', ')})` } });
+  const ticks = h('div.sunticks', null, ...[0, 2, 4].map(t => h('span', null, `${t} h`)), h('span', null, `${full}+ h`));
+  const rows = r.rooms.map(m => h('tr', null, h('td', null, m.name), h('td', null, h('i', { style: { background: rgb(api3d.SUN_RAMP[Math.min(3, Math.round((m.avg / full) * 3))]) } })),
+    h('td.num', null, `${m.avg.toFixed(1)} h`), h('td.num', null, `${Math.round(m.sunny * 100)}%`)));
+  return h('div.sunkey', null,
+    h('div.sunkeyhead', null, h('b', null, `Hours of direct sun · ${when}`), btn('×', close, { title: 'Hide the sun hours' })),
+    scale, ticks,
+    h('p.hint', null, `Each tile is one 25 cm spot of floor, or the top of the furniture standing there. ${r.day.toFixed(1)} h of daylight that day; the sunniest spot gets ${r.max.toFixed(1)} h.`),
+    h('table', null, h('tr', null, h('th', null, 'Room'), h('th'), h('th.num', null, 'Average'), h('th.num', { title: 'Share of the room with 2 hours of sun or more' }, '2 h+')), ...rows));
 }
 const compass = az => ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(az / 45) % 8];
 
@@ -809,8 +824,9 @@ async function siteDialog() {
   draw();
   const status = h('p.hint', null, st.buildings ? `${st.buildings.length} neighbouring buildings loaded.` : 'No neighbouring buildings loaded.');
   const load = btn('Load neighbouring buildings', async () => {
-    load.disabled = true; status.textContent = 'Asking OpenStreetMap for buildings within 250 m… (this can take up to a minute)';
-    try { const b = await fetchBuildings(site().lat, site().lon); save({ buildings: b }); status.textContent = `${b.length} buildings loaded; they cast shadows on the unit.`; }
+    const r = site().radius || 250;
+    load.disabled = true; status.textContent = `Asking OpenStreetMap for buildings within ${r} m… (this can take up to a minute)`;
+    try { const b = await fetchBuildings(site().lat, site().lon, r); save({ buildings: b }); status.textContent = `${b.length} buildings loaded; they cast shadows on the unit.`; }
     catch { status.textContent = 'The buildings service did not answer. Try again in a minute.'; }
     load.disabled = false;
   });
@@ -832,8 +848,11 @@ async function siteDialog() {
     row('Storeys in your building', numInput(st.storeys || 0, v => save({ storeys: Math.max(0, Math.round(v)) }), { min: 0, max: 200, title: '0 = use OpenStreetMap\'s height' })),
     row('Floor-to-floor height', lenInput(st.floorHeight, v => save({ floorHeight: v }), false)),
     h('p.hint', null, `Floor ${st.floor} puts your floor about ${fmtLen(floorElev(st), units())} above the street.`),
+    row('Buildings within', selectInput([['250', '250 m'], ['500', '500 m'], ['1000', '1 km'], ['1500', '1.5 km']], String(st.radius || 250), v => { save({ radius: +v }); status.textContent = 'Load the buildings again to fill the wider area.'; })),
     load, corners, status,
     row('Ground', selectInput([['', 'Plain'], ['satellite', 'Satellite imagery'], ['map', 'Street map']], st.imagery || '', v => save({ imagery: v || null }))),
+    row('Ground detail', selectInput([['17', 'Low (~1 m)'], ['18', 'Medium (~50 cm)'], ['19', 'High (~25 cm)']], String(st.detail || 17), v => save({ detail: +v }))),
+    h('p.hint', null, 'High detail is capped at a 4096-pixel picture, so over a wide area it falls back to less detail.'),
     h('p.hint', null, 'Map data © OpenStreetMap contributors (ODbL). Satellite imagery © Esri, Maxar, Earthstar Geographics.')), [{ label: 'Done', primary: true }]);
 }
 

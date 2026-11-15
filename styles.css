@@ -135,6 +135,16 @@ kbd { font: 11px ui-monospace, Consolas, monospace; background: #eef0f3; border:
 #c2d, #pane3d canvas { display: block; touch-action: none; outline: none; }
 .hud { position: absolute; left: 10px; bottom: 10px; display: flex; gap: 8px; flex-wrap: wrap; pointer-events: none; }
 #hud3d { left: 10px; right: 10px; top: 10px; bottom: auto; }
+.sunkey { position: absolute; left: 10px; bottom: 10px; width: 270px; max-width: calc(100% - 20px); max-height: 55%; overflow: auto; background: rgba(255, 255, 255, .96); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; box-shadow: 0 2px 8px rgba(20, 30, 50, .08); }
+.sunkeyhead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.sunkeyhead button { border-color: transparent; padding: 0 6px; font-size: 16px; line-height: 1; }
+.sunscale { height: 10px; border-radius: 3px; }
+.sunticks { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; margin-top: 2px; }
+.sunkey table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.sunkey th { color: var(--muted); font-weight: 500; text-align: left; }
+.sunkey th, .sunkey td { padding: 2px 3px; }
+.sunkey .num { text-align: right; white-space: nowrap; }
+.sunkey i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
 .hudgroup { pointer-events: auto; display: flex; align-items: center; gap: 4px; background: rgba(255, 255, 255, .94); border: 1px solid var(--line); border-radius: 9px; padding: 3px; box-shadow: 0 2px 8px rgba(20, 30, 50, .08); }
 .hudgroup button { border-color: transparent; padding: 4px 9px; }
 .hudgroup button.on { background: var(--accent); color: #fff; }

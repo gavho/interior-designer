@@ -374,28 +374,30 @@ function syncStructure() {
 // The street, your own building below the unit, and the neighbours (from OpenStreetMap, saved in the project).
 function syncContext(b, c, R) {
   const st = site(), elev = floorElev(st), sig = JSON.stringify([st, c.x.toFixed(2), c.y.toFixed(2)]);
-  const reach = st.buildings?.length ? 700 : R * 12;
+  const reach = st.buildings?.length ? Math.max(700, (st.radius || 250) * 2.8) : R * 12;
   ground.position.set(c.x, -elev - 0.02, c.y); ground.scale.setScalar(reach);
   if (sig === contextSig) return;
   contextSig = sig;
   if (context) { scene.remove(context); context.traverse(o => o.geometry?.dispose()); }
-  context = new THREE.Group(); scene.add(context);
+  context = new THREE.Group(); scene.add(context); ground.visible = true; // until the map imagery takes its place
   const facade = mat('#b9bcc0'), slab = mat('#9fa3a8');
   const own = st.buildings?.find(bd => bd.own);
   if (elev > 0.2 && !own) { // the floors below yours: a plain block under the plan
     const m = box(b.x1 - b.x0 + 0.4, elev - 0.05, b.y1 - b.y0 + 0.4, c.x, -elev / 2 - 0.05, c.y, slab);
     context.add(m);
   }
-  const extrude = (pts, from, to, material) => {
+  const prism = (pts, from, to) => {
     const shape = new THREE.Shape(pts.map(q => new THREE.Vector2(q.x, -q.y)));
-    const geo = new THREE.ExtrudeGeometry(shape, { depth: to - from, bevelEnabled: false }).rotateX(-Math.PI / 2);
-    const m = new THREE.Mesh(geo, material); m.position.y = from - elev; m.castShadow = m.receiveShadow = true;
-    context.add(m); return m;
+    return new THREE.ExtrudeGeometry(shape, { depth: to - from, bevelEnabled: false }).rotateX(-Math.PI / 2).translate(0, from - elev, 0);
   };
+  const add = (geo, material) => { const m = new THREE.Mesh(geo, material); m.castShadow = m.receiveShadow = true; context.add(m); return m; };
+  const extrude = (pts, from, to, material) => add(prism(pts, from, to), material);
+  // the neighbours, merged per 100 m tile: a wide radius can bring in thousands, and tiles keep sun-hours rays quick
+  const tiles = new Map();
   for (const bd of st.buildings || []) {
     const pts = bd.pts.map(([la, lo]) => toPlan(la, lo, st, c));
     if (pts.length < 3) continue;
-    if (!bd.own) { extrude(pts, 0, bd.h, facade).userData.neighbour = true; continue; }
+    if (!bd.own) { const k = `${Math.floor(pts[0].x / 100)},${Math.floor(pts[0].y / 100)}`; tiles.has(k) || tiles.set(k, []); tiles.get(k).push(prism(pts, 0, bd.h)); continue; }
     // your own building: the floors below the unit always, the ones above with the neighbours; your storey stays open
     if (elev > 0.2) extrude(pts, 0, elev - 0.05, slab);
     const top = elev + st.floorHeight, h = st.storeys ? st.storeys * st.floorHeight : bd.h;
@@ -403,6 +405,7 @@ function syncContext(b, c, R) {
       const m = extrude(pts, top, h, facade); m.userData.neighbour = m.userData.above = true; m.castShadow = false;
     }
   }
+  for (const geos of tiles.values()) { add(mergeGeometries(geos), facade).userData.neighbour = true; geos.forEach(g => g.dispose()); }
   context.traverse(o => { o.updateMatrix(); o.matrixAutoUpdate = false; });
   if (st.imagery) layImagery(st, c, elev, context);
   showContext();
@@ -411,8 +414,8 @@ function syncContext(b, c, R) {
 // map tiles laid on the street; fetched once per spot and kind, kept for the session (too big to save in the project)
 const imageryCache = new Map();
 async function layImagery(st, c, elev, into) {
-  const key = `${st.imagery}|${st.lat.toFixed(3)}|${st.lon.toFixed(3)}`;
-  if (!imageryCache.has(key)) imageryCache.set(key, fetchImagery(st.lat, st.lon, st.imagery).then(im => {
+  const radius = (st.radius || 250) + 100, key = `${st.imagery}|${st.detail}|${radius}|${st.lat.toFixed(3)}|${st.lon.toFixed(3)}`;
+  if (!imageryCache.has(key)) imageryCache.set(key, fetchImagery(st.lat, st.lon, st.imagery, radius, st.detail || 17).then(im => {
     const tex = new THREE.CanvasTexture(im.canvas); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
     return { tex, corners: im.corners };
   }).catch(() => (imageryCache.delete(key), null)));
@@ -425,7 +428,9 @@ async function layImagery(st, c, elev, into) {
   // the photo is lit already: dim it so the sun doesn't wash it out
   const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: im.tex, color: '#8a8a8a', roughness: 1 }));
   m.position.y = -elev + 0.03; m.receiveShadow = true; m.userData.imagery = true; m.raycast = () => {};
-  m.updateMatrix(); m.matrixAutoUpdate = false; into.add(m); shadowsDirty();
+  m.updateMatrix(); m.matrixAutoUpdate = false; into.add(m);
+  ground.visible = false; // two planes centimetres apart flicker through each other far away: the imagery is the ground now
+  shadowsDirty();
 }
 
 function placeSun() {
@@ -502,7 +507,8 @@ export async function sunHours(onProgress = () => {}) {
   // can't reach your windows, and only stop rays when the map footprint and the plan don't quite line up
   const blocks = h => !h.object.material?.transparent && !h.object.userData.above;
   scene.updateMatrixWorld(true);
-  const hours = new Float32Array(nx * ny).fill(-1), down = new THREE.Vector3(0, -1, 0);
+  const ceil = S.doc.settings.wallHeight || 2.6;
+  const hours = new Float32Array(nx * ny).fill(-1), at =new Float32Array(nx * ny), down = new THREE.Vector3(0, -1, 0);
   for (let j = 0; j < ny; j++) {
     for (let i = 0; i < nx; i++) {
       const x = b.x0 + (i + 0.5) * cell, y = b.y0 + (j + 0.5) * cell;
@@ -511,29 +517,49 @@ export async function sunHours(onProgress = () => {}) {
       rc.set(o.set(x, 2.2, y), down); rc.far = 2.2;
       const top = rc.intersectObject(itemsGroup, true).find(blocks), y0 = top ? top.point.y + 0.02 : 0.05;
       let lit = 0;
-      for (const d of dirs) { rc.set(o.set(x, y0, y), d); rc.far = 600; if (!rc.intersectObjects(blockers, true).some(blocks)) lit++; }
-      hours[j * nx + i] = lit * 0.5;
+      for (const d of dirs) {
+        // the ceiling (the slab above, which the 3D view leaves off): a ray rising past it over any room is stopped there
+        const up = (ceil - y0) / d.y, cx = x + d.x * up, cy = y + d.z * up;
+        if (y0 < ceil && S.rooms.some(r => pointInPoly({ x: cx, y: cy }, r.poly))) continue;
+        rc.set(o.set(x, y0, y), d); rc.far = 600; if (!rc.intersectObjects(blockers, true).some(blocks)) lit++;
+      }
+      hours[j * nx + i] = lit * 0.5; at[j * nx + i] = top ? top.point.y : 0; // the surface the tile is painted on
     }
     if (j % 4 === 0) { onProgress(j / ny); await new Promise(r => setTimeout(r)); }
   }
-  // paint it: deep blue (no sun) through sky blue and amber to pale yellow (6 h or more)
-  const cv = document.createElement('canvas'); cv.width = nx; cv.height = ny;
-  const g = cv.getContext('2d'), img = g.createImageData(nx, ny), ramp = [[40, 70, 160], [90, 170, 220], [250, 200, 70], [255, 240, 160]];
-  for (let k = 0; k < hours.length; k++) {
-    if (hours[k] < 0) continue;
-    const t = Math.min(1, hours[k] / 6) * (ramp.length - 1), a = Math.min(Math.floor(t), ramp.length - 2), f = t - a;
-    for (let c = 0; c < 3; c++) img.data[k * 4 + c] = ramp[a][c] + (ramp[a + 1][c] - ramp[a][c]) * f;
-    img.data[k * 4 + 3] = 170;
-  }
-  g.putImageData(img, 0, 0);
-  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
-  sunMap = new THREE.Mesh(new THREE.PlaneGeometry(nx * cell, ny * cell).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
-  sunMap.position.set(b.x0 + (nx * cell) / 2, 0.012, b.y0 + (ny * cell) / 2); sunMap.renderOrder = 2; sunMap.raycast = () => {};
+  // paint it where it was measured, a tile per spot: on the floor, or on the sofa, bed or table standing there
+  const cells = []; for (let k = 0; k < hours.length; k++) if (hours[k] >= 0) cells.push(k);
+  sunMap = new THREE.InstancedMesh(new THREE.PlaneGeometry(cell, cell).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.7, depthWrite: false }), cells.length);
+  const mtx = new THREE.Matrix4(), col = new THREE.Color();
+  cells.forEach((k, n) => {
+    const i = k % nx, j = Math.floor(k / nx);
+    sunMap.setMatrixAt(n, mtx.makeTranslation(b.x0 + (i + 0.5) * cell, at[k] + 0.012, b.y0 + (j + 0.5) * cell));
+    sunMap.setColorAt(n, col.setRGB(...sunColor(hours[k]).map(v => v / 255), THREE.SRGBColorSpace));
+  });
+  sunMap.renderOrder = 2; sunMap.raycast = () => {}; sunMap.frustumCulled = false; // its bounds would be one tile's
   scene.add(sunMap);
-  let max = 0, sum = 0, n = 0; for (const v of hours) if (v >= 0) { max = Math.max(max, v); sum += v; n++; }
-  return { max, avg: n ? sum / n : 0, day: (set - rise) / 60 };
+  // the summary, room by room: the average, and how much of the room gets 2 hours of sun or more
+  const rooms = new Map();
+  let max = 0, sum = 0;
+  for (const k of cells) {
+    const v = hours[k], p = { x: b.x0 + ((k % nx) + 0.5) * cell, y: b.y0 + (Math.floor(k / nx) + 0.5) * cell };
+    max = Math.max(max, v); sum += v;
+    const r = S.rooms.find(r => pointInPoly(p, r.poly)), name = r?.meta?.name || 'Room';
+    const e = rooms.get(r) || rooms.set(r, { name, n: 0, sum: 0, sunny: 0 }).get(r);
+    e.n++; e.sum += v; if (v >= 2) e.sunny++;
+  }
+  return {
+    max, avg: cells.length ? sum / cells.length : 0, day: (set - rise) / 60,
+    rooms: [...rooms.values()].map(e => ({ name: e.name, avg: e.sum / e.n, sunny: e.sunny / e.n })).sort((a, b) => b.avg - a.avg),
+  };
 }
-export function clearSunHours() { if (sunMap) { scene.remove(sunMap); sunMap.geometry.dispose(); sunMap.material.map.dispose(); sunMap = null; } }
+// deep blue (no sun) through sky blue and amber to pale yellow (6 h or more); the legend draws the same ramp
+export const SUN_RAMP = [[40, 70, 160], [90, 170, 220], [250, 200, 70], [255, 240, 160]], SUN_FULL = 6;
+function sunColor(hrs) {
+  const t = Math.min(1, hrs / SUN_FULL) * (SUN_RAMP.length - 1), a = Math.min(Math.floor(t), SUN_RAMP.length - 2), f = t - a;
+  return [0, 1, 2].map(c => SUN_RAMP[a][c] + (SUN_RAMP[a + 1][c] - SUN_RAMP[a][c]) * f);
+}
+export function clearSunHours() { if (sunMap) { scene.remove(sunMap); sunMap.geometry.dispose(); sunMap.material.dispose(); sunMap.dispose(); sunMap = null; } }
 
 /** Sun by date ('YYYY-MM-DD') and local time at the site (minutes after midnight). */
 export function setSunTime(patch) { Object.assign(sunWhen, patch); placeSun(); }
