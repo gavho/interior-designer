@@ -833,7 +833,8 @@ async function siteDialog() {
     row('Floor-to-floor height', lenInput(st.floorHeight, v => save({ floorHeight: v }), false)),
     h('p.hint', null, `Floor ${st.floor} puts your floor about ${fmtLen(floorElev(st), units())} above the street.`),
     load, corners, status,
-    h('p.hint', null, 'Map data © OpenStreetMap contributors (ODbL).')), [{ label: 'Done', primary: true }]);
+    row('Ground', selectInput([['', 'Plain'], ['satellite', 'Satellite imagery'], ['map', 'Street map']], st.imagery || '', v => save({ imagery: v || null }))),
+    h('p.hint', null, 'Map data © OpenStreetMap contributors (ODbL). Satellite imagery © Esri, Maxar, Earthstar Geographics.')), [{ label: 'Done', primary: true }]);
 }
 
 function buildStatus() {

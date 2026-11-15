@@ -19,7 +19,7 @@ import { POINT_KINDS, CABLE_KINDS, cable3d } from './electrical.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { sunPosition, zonedInstant, daylight } from './sun.js';
-import { site, floorElev, bearingDir, toPlan } from './site.js';
+import { site, floorElev, bearingDir, toPlan, fetchImagery } from './site.js';
 
 let renderer, scene, camera, controls, pane, sun, hemi, structure, itemsGroup, helpers, ground;
 let wallMode = 'auto', structSig = '', wallObjs = [], needFit = true;
@@ -399,10 +399,33 @@ function syncContext(b, c, R) {
     // your own building: the floors below the unit always, the ones above with the neighbours; your storey stays open
     if (elev > 0.2) extrude(pts, 0, elev - 0.05, slab);
     const top = elev + st.floorHeight, h = st.storeys ? st.storeys * st.floorHeight : bd.h;
-    if (h > top + 0.5) extrude(pts, top, h, facade).userData.neighbour = true;
+    if (h > top + 0.5) { // the storeys above can't shade your own windows (the facade is straight), so they cast no shadow here
+      const m = extrude(pts, top, h, facade); m.userData.neighbour = m.userData.above = true; m.castShadow = false;
+    }
   }
   context.traverse(o => { o.updateMatrix(); o.matrixAutoUpdate = false; });
+  if (st.imagery) layImagery(st, c, elev, context);
   showContext();
+}
+
+// map tiles laid on the street; fetched once per spot and kind, kept for the session (too big to save in the project)
+const imageryCache = new Map();
+async function layImagery(st, c, elev, into) {
+  const key = `${st.imagery}|${st.lat.toFixed(3)}|${st.lon.toFixed(3)}`;
+  if (!imageryCache.has(key)) imageryCache.set(key, fetchImagery(st.lat, st.lon, st.imagery).then(im => {
+    const tex = new THREE.CanvasTexture(im.canvas); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+    return { tex, corners: im.corners };
+  }).catch(() => (imageryCache.delete(key), null)));
+  const im = await imageryCache.get(key);
+  if (!im || context !== into) return; // failed, or the street was rebuilt while the tiles came in
+  const p = im.corners.map(q => toPlan(q.lat, q.lon, st, c)), geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(p.flatMap(q => [q.x, 0, q.y]), 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute([0, 1, 1, 1, 1, 0, 0, 0], 2));
+  geo.setIndex([0, 2, 1, 0, 3, 2]); geo.computeVertexNormals();
+  // the photo is lit already: dim it so the sun doesn't wash it out
+  const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: im.tex, color: '#8a8a8a', roughness: 1 }));
+  m.position.y = -elev + 0.03; m.receiveShadow = true; m.userData.imagery = true; m.raycast = () => {};
+  m.updateMatrix(); m.matrixAutoUpdate = false; into.add(m); shadowsDirty();
 }
 
 function placeSun() {
@@ -462,7 +485,7 @@ const unseen = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: fals
 export function showContext(v = S.prefs.showContext) { const on = S.walk || v; context?.children.forEach(m => { if (m.userData.neighbour) m.material = on ? mat('#b9bcc0') : unseen; }); }
 export const setWallMode = m => { wallMode = m; };
 
-// ---- sun-hours map: hours of direct sun on each spot of floor over the chosen day (walls, furniture and neighbours block it; glass doesn't) ----
+// ---- sun-hours map: hours of direct sun on each spot of floor (or furniture top) over the chosen day (walls, furniture and neighbours block it; glass doesn't) ----
 let sunMap = null;
 export async function sunHours(onProgress = () => {}) {
   clearSunHours();
@@ -475,15 +498,20 @@ export async function sunHours(onProgress = () => {}) {
     if (p.el > 0) dirs.push(new THREE.Vector3(d.x * Math.cos(e), Math.sin(e), d.y * Math.cos(e)));
   }
   const blockers = [structure, itemsGroup, ...(context ? [context] : [])], rc = new THREE.Raycaster(), o = new THREE.Vector3();
-  const blocks = h => !h.object.material?.transparent; // glass lets the sun through (hidden neighbours' material isn't transparent: they still block)
+  // glass lets the sun through (hidden neighbours' material isn't transparent: they still block); the storeys above your own
+  // can't reach your windows, and only stop rays when the map footprint and the plan don't quite line up
+  const blocks = h => !h.object.material?.transparent && !h.object.userData.above;
   scene.updateMatrixWorld(true);
-  const hours = new Float32Array(nx * ny).fill(-1);
+  const hours = new Float32Array(nx * ny).fill(-1), down = new THREE.Vector3(0, -1, 0);
   for (let j = 0; j < ny; j++) {
     for (let i = 0; i < nx; i++) {
       const x = b.x0 + (i + 0.5) * cell, y = b.y0 + (j + 0.5) * cell;
       if (!S.rooms.some(r => pointInPoly({ x, y }, r.poly))) continue;
+      // measure where the sun lands: the floor, or the top of the sofa, bed or table standing on it
+      rc.set(o.set(x, 2.2, y), down); rc.far = 2.2;
+      const top = rc.intersectObject(itemsGroup, true).find(blocks), y0 = top ? top.point.y + 0.02 : 0.05;
       let lit = 0;
-      for (const d of dirs) { rc.set(o.set(x, 0.05, y), d); rc.far = 600; if (!rc.intersectObjects(blockers, true).some(blocks)) lit++; }
+      for (const d of dirs) { rc.set(o.set(x, y0, y), d); rc.far = 600; if (!rc.intersectObjects(blockers, true).some(blocks)) lit++; }
       hours[j * nx + i] = lit * 0.5;
     }
     if (j % 4 === 0) { onProgress(j / ny); await new Promise(r => setTimeout(r)); }
@@ -637,8 +665,7 @@ export function init3d(el) {
   sun = new THREE.DirectionalLight(0xfff3dc, 2.4); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
   ground = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#dfe4e8', roughness: 1 }));
   ground.receiveShadow = true;
-  structure = new THREE.Group(); itemsGroup = new THREE.Group(); helpers = new THREE.Group();
-  scene.add(hemi, sun, sun.target, new THREE.AmbientLight(0xffffff, 0.15), ground, structure, itemsGroup, helpers);
+  structure = new THREE.Group(); itemsGroup = new THREE.Group(); helpers = new THREE.Group();  scene.add(hemi, sun, sun.target, new THREE.AmbientLight(0xffffff, 0.15), ground, structure, itemsGroup, helpers);
   sky = new Sky(); sky.scale.setScalar(2400); sky.visible = S.prefs.sky !== false;
   Object.assign(sky.material.uniforms, {}); sky.material.uniforms.turbidity.value = 3; sky.material.uniforms.rayleigh.value = 1.1;
   sky.material.uniforms.mieCoefficient.value = 0.004; sky.material.uniforms.mieDirectionalG.value = 0.8;

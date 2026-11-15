@@ -67,6 +67,28 @@ export async function fetchBuildings(lat, lon, radius = 250) {
   }
   return out;
 }
+// ---- ground imagery: map tiles around the site, stitched into one picture to lay under the buildings ----
+export const IMAGERY = {
+  satellite: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
+  map: { url: (z, x, y) => `https://tile.openstreetmap.org/${z}/${x}/${y}.png`, credit: 'Map © OpenStreetMap contributors' },
+};
+const tileXY = (lat, lon, z) => { const n = 2 ** z, s = Math.sin(rad(lat)); return { x: ((lon + 180) / 360) * n, y: (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * n }; };
+const tileLatLon = (x, y, z) => { const n = 2 ** z; return { lat: (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / n))) * 180) / Math.PI, lon: (x / n) * 360 - 180 }; };
+
+/** A low-res picture of the ground `radius` m around a point: { canvas, corners: [nw, ne, se, sw] as { lat, lon } }. */
+export async function fetchImagery(lat, lon, kind = 'satellite', radius = 350, z = 17) {
+  const src = IMAGERY[kind] || IMAGERY.satellite, c = tileXY(lat, lon, z), span = radius / ((156543.03 * Math.cos(rad(lat))) / 2 ** z) / 256; // radius in tiles
+  const x0 = Math.floor(c.x - span), x1 = Math.floor(c.x + span), y0 = Math.floor(c.y - span), y1 = Math.floor(c.y + span);
+  const canvas = document.createElement('canvas'); canvas.width = (x1 - x0 + 1) * 256; canvas.height = (y1 - y0 + 1) * 256;
+  const g = canvas.getContext('2d'), jobs = [];
+  for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
+    jobs.push(new Promise(ok => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => { g.drawImage(im, (x - x0) * 256, (y - y0) * 256); ok(1); }; im.onerror = () => ok(0); im.src = src.url(z, x, y); }));
+  }
+  if (!(await Promise.all(jobs)).some(Boolean)) throw new Error('imagery');
+  const nw = tileLatLon(x0, y0, z), se = tileLatLon(x1 + 1, y1 + 1, z);
+  return { canvas, credit: src.credit, corners: [nw, { lat: nw.lat, lon: se.lon }, se, { lat: se.lat, lon: nw.lon }] };
+}
+
 function inside([y, x], pts) {
   let c = false;
   for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
