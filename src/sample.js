@@ -149,7 +149,9 @@ export async function loadMine() {
     const r = await fetch('samples/next-chicago-il-floorplan.png');
     if (r.ok) assets.trace = { name: 'next-chicago-il-floorplan.png', kind: 'image', data: await readAsDataURL(await r.blob()) };
   } catch {}
-  const doc = buildSample(true);
+  let doc = null;
+  try { const r = await fetch('samples/my-apartment.json'); if (r.ok) doc = (await r.json()).doc; } catch {} // the furnished, sited plan saved from the app
+  doc = doc || buildSample(true);
   if (!assets.trace) doc.trace = null;
   setDoc(doc, assets);
   S.sel = [];

@@ -661,8 +661,9 @@ function frame(now) {
 // Adaptive resolution: render fewer pixels while frames are slow, sharpen again when there is headroom.
 function adapt(ms) {
   if (S.prefs.adaptiveRes === false || ms > 250) return; // a long gap is a hidden tab, not a slow frame
-  if (ms > 20) { fastFrames = 0; if (++slowFrames > 20 && dynScale > 0.6) { dynScale = Math.max(0.6, dynScale - 0.1); slowFrames = 0; applyPixelRatio(); } }
-  else if (ms < 13) { slowFrames = 0; if (++fastFrames > 180 && dynScale < 1) { dynScale = Math.min(1, dynScale + 0.1); fastFrames = 0; applyPixelRatio(); } }
+  // 60 Hz frames are ~16.7 ms, so "fast" means keeping up with the screen, and "slow" means missing whole frames in a row
+  if (ms > 25) { fastFrames = 0; if (++slowFrames > 20 && dynScale > 0.6) { dynScale = Math.max(0.6, dynScale - 0.1); slowFrames = 0; applyPixelRatio(); } }
+  else { slowFrames = 0; if (ms < 18 && ++fastFrames > 120 && dynScale < 1) { dynScale = Math.min(1, dynScale + 0.1); fastFrames = 0; applyPixelRatio(); } }
 }
 const baseRatio = () => Math.min(window.devicePixelRatio, quality === 'high' ? 2.5 : phone ? 1.25 : 1.5);
 function applyPixelRatio() { renderer.setPixelRatio(baseRatio() * dynScale); resize(); }
