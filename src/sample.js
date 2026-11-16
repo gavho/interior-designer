@@ -3,7 +3,8 @@
 // SCALE converts them to metres: every labelled room measures true wall-to-wall at 0.0127 m/px (Entertain 412 × 426 px =
 // 17'2" × 17'9"), and the unit's outline at that scale is 985 sq ft against the listed 980.
 import { S, setDoc, newDoc } from './state.js';
-import { uid, readAsDataURL, rot, add } from './util.js';
+import { uid, readAsDataURL, rot, add, phone } from './util.js';
+import { toPlan } from './site.js';
 import { makeItem } from './ops.js';
 
 export const SCALE = 0.0127;
@@ -144,13 +145,14 @@ function furnishMine(put) {
 
 /** Start a fresh copy of the real apartment (keeps the current plan in its saved slot, if it has one). */
 export async function loadMine() {
-  const assets = {};
-  try {
+  let doc = null, assets = {};
+  try { const r = await fetch('samples/my-apartment.json'); if (r.ok) ({ doc, assets = {} } = await r.json()); } catch {} // the furnished, sited plan saved from the app
+  if (!assets.trace) try {
     const r = await fetch('samples/next-chicago-il-floorplan.png');
     if (r.ok) assets.trace = { name: 'next-chicago-il-floorplan.png', kind: 'image', data: await readAsDataURL(await r.blob()) };
   } catch {}
-  let doc = null;
-  try { const r = await fetch('samples/my-apartment.json'); if (r.ok) doc = (await r.json()).doc; } catch {} // the furnished, sited plan saved from the app
+  const st = doc?.settings?.site; // phones keep the neighbours within 500 m (the saved plan reaches 1.5 km)
+  if (phone && st?.buildings) st.buildings = st.buildings.filter(b => b.own || Math.hypot(...Object.values(toPlan(b.pts[0][0], b.pts[0][1], st, { x: 0, y: 0 }))) <= 500);
   doc = doc || buildSample(true);
   if (!assets.trace) doc.trace = null;
   setDoc(doc, assets);
